@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from "react";
 import { Word, getDailyWords, dictionary, shuffleArray } from "@/data/dictionary";
 import {
   DailyProgress,
@@ -50,6 +50,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [extraSession, setExtraSession] = useState<ExtraWordsSession | null>(null);
   const [themePreference, setThemePref] = useState<"light" | "dark" | "system">("system");
   const [isLoading, setIsLoading] = useState(true);
+  const isInitialLoadRef = useRef(true);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -73,8 +74,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    loadData();
+    loadData().then(() => {
+      isInitialLoadRef.current = false;
+    });
   }, [loadData]);
+
+  // Auto-save dailyProgress when it changes (after initial load)
+  useEffect(() => {
+    if (!isInitialLoadRef.current && dailyProgress.date) {
+      saveDailyProgress(dailyProgress);
+    }
+  }, [dailyProgress]);
+
+  // Auto-save extraSession when it changes (after initial load)
+  useEffect(() => {
+    if (!isInitialLoadRef.current && extraSession) {
+      saveExtraWordsSession(extraSession);
+    }
+  }, [extraSession]);
 
   const refreshProgress = useCallback(async () => {
     const [progress, extra] = await Promise.all([
@@ -99,47 +116,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const currentProgress = prev[progressKey];
         if (currentProgress.includes(wordId)) return prev;
         
-        const updatedSession = {
+        return {
           ...prev,
           [progressKey]: [...currentProgress, wordId],
         };
-        saveExtraWordsSession(updatedSession);
-        return updatedSession;
       });
     } else {
       setDailyProgress(prev => {
         const currentProgress = prev[progressKey];
         if (currentProgress.includes(wordId)) return prev;
         
-        const updatedProgress = {
+        return {
           ...prev,
           [progressKey]: [...currentProgress, wordId],
         };
-        saveDailyProgress(updatedProgress);
-        return updatedProgress;
       });
     }
   }, []);
 
   const markModeCompleted = useCallback(async (mode: PracticeMode, isExtra = false) => {
-    if (isExtra && extraSession) {
-      const completedKey = mode === "englishToMongolian" ? "englishToMongolianCompleted" : "mongolianToEnglishCompleted";
-      const updatedSession = {
-        ...extraSession,
-        [completedKey]: true,
-      };
-      setExtraSession(updatedSession);
-      await saveExtraWordsSession(updatedSession);
+    const completedKey = mode === "englishToMongolian" ? "englishToMongolianCompleted" : "mongolianToEnglishCompleted";
+    
+    if (isExtra) {
+      setExtraSession(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          [completedKey]: true,
+        };
+      });
     } else {
-      const completedKey = mode === "englishToMongolian" ? "englishToMongolianCompleted" : "mongolianToEnglishCompleted";
-      const updatedProgress = {
-        ...dailyProgress,
+      setDailyProgress(prev => ({
+        ...prev,
         [completedKey]: true,
-      };
-      setDailyProgress(updatedProgress);
-      await saveDailyProgress(updatedProgress);
+      }));
     }
-  }, [dailyProgress, extraSession]);
+  }, []);
 
   const getWordsForMode = useCallback((mode: PracticeMode, isExtra = false): Word[] => {
     const words = isExtra && extraSession ? extraSession.words : dailyWords;
@@ -215,13 +227,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const replacementWord = shuffleArray(availableWords, Date.now()).slice(0, 1);
       const updatedWords = [...remainingWords, ...replacementWord];
       
-      const updatedSession: ExtraWordsSession = {
-        ...extraSession,
-        words: updatedWords,
-      };
-      
-      setExtraSession(updatedSession);
-      await saveExtraWordsSession(updatedSession);
+      setExtraSession(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          words: updatedWords,
+        };
+      });
     } else {
       const remainingDailyWords = dailyWords.filter(w => w.id !== wordId);
       const existingIds = new Set(remainingDailyWords.map(w => w.id));

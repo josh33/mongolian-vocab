@@ -26,8 +26,9 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Flow
 - Daily vocabulary words are selected deterministically based on the current date using a seeded shuffle algorithm
-- Progress is persisted locally using AsyncStorage (daily progress, theme preference, extra word sessions)
+- Progress is persisted locally using AsyncStorage (daily progress, theme preference, extra word sessions, word confidence levels)
 - The dictionary is embedded client-side with 60+ words across categories (greetings, numbers, family, nature)
+- **Confidence Scoring**: Each word can have a confidence level (learning/familiar/mastered) that persists across sessions
 
 ### Key Design Patterns
 - **Path Aliases**: `@/` maps to `./client`, `@shared/` maps to `./shared`

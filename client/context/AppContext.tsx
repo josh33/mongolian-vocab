@@ -10,6 +10,9 @@ import {
   clearExtraWordsSession,
   getThemePreference,
   saveThemePreference,
+  deleteWord,
+  getDeletedWordIds,
+  getUserDictionary,
 } from "@/lib/storage";
 
 export type PracticeMode = "englishToMongolian" | "mongolianToEnglish";
@@ -30,6 +33,7 @@ interface AppContextType {
   requestNewWords: () => Promise<void>;
   hasExtraSession: boolean;
   refreshProgress: () => Promise<void>;
+  deleteWordDuringStudy: (wordId: number, isExtra: boolean) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -189,6 +193,57 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await saveExtraWordsSession(newSession);
   }, [dailyWords]);
 
+  const deleteWordDuringStudy = useCallback(async (wordId: number, isExtra: boolean) => {
+    await deleteWord(wordId);
+    
+    const [deletedIds, userDict] = await Promise.all([
+      getDeletedWordIds(),
+      getUserDictionary(),
+    ]);
+    
+    if (isExtra && extraSession) {
+      const remainingWords = extraSession.words.filter(w => w.id !== wordId);
+      const existingIds = new Set([...dailyWords.map(w => w.id), ...remainingWords.map(w => w.id)]);
+      
+      const availableWords = dictionary
+        .filter(w => !existingIds.has(w.id) && !deletedIds.includes(w.id))
+        .concat(userDict.words.filter(w => !existingIds.has(w.id)));
+      
+      const replacementWord = shuffleArray(availableWords, Date.now()).slice(0, 1);
+      const updatedWords = [...remainingWords, ...replacementWord];
+      
+      const updatedSession: ExtraWordsSession = {
+        ...extraSession,
+        words: updatedWords,
+        englishToMongolianProgress: extraSession.englishToMongolianProgress.filter(id => id !== wordId),
+        mongolianToEnglishProgress: extraSession.mongolianToEnglishProgress.filter(id => id !== wordId),
+      };
+      
+      setExtraSession(updatedSession);
+      await saveExtraWordsSession(updatedSession);
+    } else {
+      const remainingDailyWords = dailyWords.filter(w => w.id !== wordId);
+      const existingIds = new Set(remainingDailyWords.map(w => w.id));
+      
+      const availableWords = dictionary
+        .filter(w => !existingIds.has(w.id) && !deletedIds.includes(w.id))
+        .concat(userDict.words.filter(w => !existingIds.has(w.id)));
+      
+      const replacementWord = shuffleArray(availableWords, Date.now()).slice(0, 1);
+      const updatedDailyWords = [...remainingDailyWords, ...replacementWord];
+      
+      setDailyWords(updatedDailyWords);
+      
+      const updatedProgress: DailyProgress = {
+        ...dailyProgress,
+        englishToMongolianProgress: dailyProgress.englishToMongolianProgress.filter(id => id !== wordId),
+        mongolianToEnglishProgress: dailyProgress.mongolianToEnglishProgress.filter(id => id !== wordId),
+      };
+      setDailyProgress(updatedProgress);
+      await saveDailyProgress(updatedProgress);
+    }
+  }, [dailyWords, dailyProgress, extraSession]);
+
   const value: AppContextType = {
     dailyWords,
     dailyProgress,
@@ -205,6 +260,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     requestNewWords,
     hasExtraSession: extraSession !== null,
     refreshProgress,
+    deleteWordDuringStudy,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

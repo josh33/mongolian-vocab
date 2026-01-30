@@ -14,7 +14,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#1B3A6B",
+        "backgroundColor": "#1A1A1A",
         "foregroundImage": "./assets/images/icon.png"
       },
       "package": "com.mongolianvocab.app",

@@ -75,7 +75,7 @@ export default function SettingsScreen() {
             Dictionary Size
           </ThemedText>
           <ThemedText style={[styles.settingValue, { color: colors.textSecondary }]}>
-            150 words
+            600 words
           </ThemedText>
         </View>
       </View>

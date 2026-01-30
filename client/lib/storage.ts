@@ -5,7 +5,14 @@ const STORAGE_KEYS = {
   DAILY_PROGRESS: "daily_progress",
   THEME_PREFERENCE: "theme_preference",
   EXTRA_WORDS_SESSION: "extra_words_session",
+  WORD_CONFIDENCE: "word_confidence",
 };
+
+export type ConfidenceLevel = "learning" | "familiar" | "mastered";
+
+export interface WordConfidence {
+  [wordId: number]: ConfidenceLevel;
+}
 
 export interface DailyProgress {
   date: string;
@@ -110,4 +117,34 @@ export async function saveThemePreference(theme: "light" | "dark" | "system"): P
   } catch (error) {
     console.error("Failed to save theme preference:", error);
   }
+}
+
+export async function getWordConfidence(): Promise<WordConfidence> {
+  try {
+    const stored = await AsyncStorage.getItem(STORAGE_KEYS.WORD_CONFIDENCE);
+    if (stored) {
+      return JSON.parse(stored) as WordConfidence;
+    }
+    return {};
+  } catch {
+    return {};
+  }
+}
+
+export async function saveWordConfidence(confidence: WordConfidence): Promise<void> {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEYS.WORD_CONFIDENCE, JSON.stringify(confidence));
+  } catch (error) {
+    console.error("Failed to save word confidence:", error);
+  }
+}
+
+export async function updateWordConfidenceLevel(
+  wordId: number,
+  level: ConfidenceLevel
+): Promise<WordConfidence> {
+  const current = await getWordConfidence();
+  const updated = { ...current, [wordId]: level };
+  await saveWordConfidence(updated);
+  return updated;
 }

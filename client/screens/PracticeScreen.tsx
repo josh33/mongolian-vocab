@@ -14,6 +14,12 @@ import { Colors, Spacing, Shadows } from "@/constants/theme";
 import { useApp, PracticeMode } from "@/context/AppContext";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { Word } from "@/data/dictionary";
+import { 
+  ConfidenceLevel, 
+  WordConfidence, 
+  getWordConfidence, 
+  updateWordConfidenceLevel 
+} from "@/lib/storage";
 
 type PracticeRouteProp = RouteProp<RootStackParamList, "Practice">;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -35,14 +41,15 @@ export default function PracticeScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [completedIndices, setCompletedIndices] = useState<number[]>([]);
+  const [wordConfidence, setWordConfidence] = useState<WordConfidence>({});
 
   useEffect(() => {
     const wordsForMode = getWordsForMode(mode, isExtra);
     setWords(wordsForMode);
-    // Always start fresh from position 0 with empty progress
-    // This ensures dots show clean 1-2-3-4-5 progression
     setCurrentIndex(0);
     setCompletedIndices([]);
+    
+    getWordConfidence().then(setWordConfidence);
   }, [mode, isExtra, getWordsForMode]);
 
   const handleFlip = useCallback(() => {
@@ -85,6 +92,16 @@ export default function PracticeScreen() {
 
   const isLastCard = currentIndex >= words.length - 1;
   const buttonText = isLastCard ? "Finish" : "Next";
+  
+  const currentConfidence = currentWord 
+    ? wordConfidence[currentWord.id] || null 
+    : null;
+
+  const handleConfidenceChange = useCallback(async (level: ConfidenceLevel) => {
+    if (!currentWord) return;
+    const updated = await updateWordConfidenceLevel(currentWord.id, level);
+    setWordConfidence(updated);
+  }, [currentWord]);
 
   if (!currentWord) {
     return null;
@@ -121,6 +138,8 @@ export default function PracticeScreen() {
           mode={mode}
           isFlipped={isFlipped}
           onFlip={handleFlip}
+          confidenceLevel={currentConfidence}
+          onConfidenceChange={handleConfidenceChange}
         />
       </View>
 

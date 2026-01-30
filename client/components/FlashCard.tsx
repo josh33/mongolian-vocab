@@ -11,23 +11,35 @@ import Animated, {
 import * as Haptics from "expo-haptics";
 
 import { ThemedText } from "@/components/ThemedText";
+import { ConfidenceIndicator } from "@/components/ConfidenceIndicator";
+import { ConfidenceButtons } from "@/components/ConfidenceButtons";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { Word } from "@/data/dictionary";
 import { PracticeMode } from "@/context/AppContext";
+import { ConfidenceLevel } from "@/lib/storage";
 
 interface FlashCardProps {
   word: Word;
   mode: PracticeMode;
   isFlipped: boolean;
   onFlip: () => void;
+  confidenceLevel: ConfidenceLevel | null;
+  onConfidenceChange: (level: ConfidenceLevel) => void;
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.lg * 2;
-const CARD_HEIGHT = 280;
+const CARD_HEIGHT = 340;
 
-export function FlashCard({ word, mode, isFlipped, onFlip }: FlashCardProps) {
+export function FlashCard({ 
+  word, 
+  mode, 
+  isFlipped, 
+  onFlip, 
+  confidenceLevel, 
+  onConfidenceChange 
+}: FlashCardProps) {
   const { theme, isDark } = useTheme();
   const rotation = useSharedValue(isFlipped ? 180 : 0);
 
@@ -88,8 +100,13 @@ export function FlashCard({ word, mode, isFlipped, onFlip }: FlashCardProps) {
           frontAnimatedStyle,
         ]}
       >
-        <View style={[styles.labelBadge, { backgroundColor: colors.primary }]}>
-          <ThemedText style={styles.labelText}>{frontLabel}</ThemedText>
+        <View style={styles.topRow}>
+          <View style={[styles.labelBadge, { backgroundColor: colors.primary }]}>
+            <ThemedText style={styles.labelText}>{frontLabel}</ThemedText>
+          </View>
+          <View style={styles.confidenceContainer}>
+            <ConfidenceIndicator level={confidenceLevel} />
+          </View>
         </View>
         <View style={styles.wordContainer}>
           <ThemedText style={[styles.wordText, { color: colors.text }]}>
@@ -124,10 +141,12 @@ export function FlashCard({ word, mode, isFlipped, onFlip }: FlashCardProps) {
             />
           ))}
         </View>
-        <View style={[styles.labelBadge, { backgroundColor: colors.secondary }]}>
-          <ThemedText style={[styles.labelText, { color: colors.primary }]}>
-            {backLabel}
-          </ThemedText>
+        <View style={styles.backTopRow}>
+          <View style={[styles.labelBadge, { backgroundColor: colors.secondary }]}>
+            <ThemedText style={[styles.labelText, { color: colors.primary }]}>
+              {backLabel}
+            </ThemedText>
+          </View>
         </View>
         <View style={styles.wordContainer}>
           <ThemedText style={[styles.wordText, { color: colors.text }]}>
@@ -138,6 +157,12 @@ export function FlashCard({ word, mode, isFlipped, onFlip }: FlashCardProps) {
               ({pronunciation})
             </ThemedText>
           ) : null}
+        </View>
+        <View style={styles.confidenceButtonsContainer}>
+          <ConfidenceButtons
+            currentLevel={confidenceLevel}
+            onSelect={onConfidenceChange}
+          />
         </View>
       </Animated.View>
     </Pressable>
@@ -178,12 +203,37 @@ const styles = StyleSheet.create({
     width: 500,
     height: 2,
   },
-  labelBadge: {
+  topRow: {
     position: "absolute",
     top: Spacing.xl,
+    left: Spacing.xl,
+    right: Spacing.xl,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  confidenceContainer: {
+    alignItems: "flex-end",
+  },
+  backTopRow: {
+    position: "absolute",
+    top: Spacing.xl,
+    left: Spacing.xl,
+    right: Spacing.xl,
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    alignItems: "center",
+  },
+  labelBadge: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.full,
+  },
+  confidenceButtonsContainer: {
+    position: "absolute",
+    bottom: Spacing.xl,
+    left: Spacing.md,
+    right: Spacing.md,
   },
   labelText: {
     fontSize: 12,

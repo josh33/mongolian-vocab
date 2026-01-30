@@ -86,7 +86,7 @@ export function FlashCard({
   const frontLabel = mode === "englishToMongolian" ? "English" : "Mongolian";
   const backWord = mode === "englishToMongolian" ? word.mongolian : word.english;
   const backLabel = mode === "englishToMongolian" ? "Mongolian" : "English";
-  const pronunciation = mode === "englishToMongolian" ? word.pronunciation : null;
+  const pronunciation = null;
 
   const colors = isDark ? Colors.dark : Colors.light;
 

@@ -9,6 +9,7 @@ import { ConfidenceLevel } from "@/lib/storage";
 interface ConfidenceButtonsProps {
   currentLevel: ConfidenceLevel | null;
   onSelect: (level: ConfidenceLevel) => void;
+  onAdvance: () => void;
 }
 
 const CONFIDENCE_OPTIONS: {
@@ -21,13 +22,19 @@ const CONFIDENCE_OPTIONS: {
   { level: "mastered", label: "Mastered", color: "#81C784" },
 ];
 
-export function ConfidenceButtons({ currentLevel, onSelect }: ConfidenceButtonsProps) {
+export function ConfidenceButtons({ currentLevel, onSelect, onAdvance }: ConfidenceButtonsProps) {
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
 
   const handlePress = (level: ConfidenceLevel) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onSelect(level);
+    onAdvance();
+  };
+
+  const handleSkip = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onAdvance();
   };
 
   return (
@@ -66,6 +73,15 @@ export function ConfidenceButtons({ currentLevel, onSelect }: ConfidenceButtonsP
           );
         })}
       </View>
+      <Pressable
+        onPress={handleSkip}
+        style={[styles.skipButton, { borderColor: colors.textSecondary }]}
+        testID="confidence-skip"
+      >
+        <ThemedText style={[styles.skipText, { color: colors.textSecondary }]}>
+          Skip
+        </ThemedText>
+      </Pressable>
     </View>
   );
 }
@@ -94,5 +110,16 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 12,
     fontWeight: "600",
+  },
+  skipButton: {
+    marginTop: Spacing.xs,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
+  skipText: {
+    fontSize: 12,
+    fontWeight: "500",
   },
 });

@@ -27,6 +27,7 @@ interface FlashCardProps {
   onFlip: () => void;
   confidenceLevel: ConfidenceLevel | null;
   onConfidenceChange: (level: ConfidenceLevel) => void;
+  onAdvance: () => void;
   onEditPress?: () => void;
 }
 
@@ -41,6 +42,7 @@ export function FlashCard({
   onFlip, 
   confidenceLevel, 
   onConfidenceChange,
+  onAdvance,
   onEditPress,
 }: FlashCardProps) {
   const { theme, isDark } = useTheme();
@@ -178,6 +180,7 @@ export function FlashCard({
           <ConfidenceButtons
             currentLevel={confidenceLevel}
             onSelect={onConfidenceChange}
+            onAdvance={onAdvance}
           />
         </View>
       </Animated.View>

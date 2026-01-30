@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { StyleSheet, View, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
@@ -36,20 +36,46 @@ export default function PracticeScreen() {
     markModeCompleted,
   } = useApp();
 
-  const [words, setWords] = useState<Word[]>([]);
+  const words = useMemo(() => getWordsForMode(mode, isExtra), [getWordsForMode, mode, isExtra]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [completedIndices, setCompletedIndices] = useState<number[]>([]);
   const [wordConfidence, setWordConfidence] = useState<WordConfidence>({});
+  const previousWordIdsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
-    const wordsForMode = getWordsForMode(mode, isExtra);
-    setWords(wordsForMode);
     setCurrentIndex(0);
     setCompletedIndices([]);
-    
+    previousWordIdsRef.current = new Set(words.map(w => w.id));
     getWordConfidence().then(setWordConfidence);
-  }, [mode, isExtra, getWordsForMode]);
+  }, [mode, isExtra]);
+
+  useEffect(() => {
+    const currentWordIds = new Set(words.map(w => w.id));
+    const previousWordIds = previousWordIdsRef.current;
+    
+    const deletedWordId = [...previousWordIds].find(id => !currentWordIds.has(id));
+    
+    if (deletedWordId !== undefined) {
+      const deletedIndex = [...previousWordIds].indexOf(deletedWordId);
+      
+      if (deletedIndex >= 0 && deletedIndex < currentIndex) {
+        setCurrentIndex(prev => Math.max(0, prev - 1));
+      } else if (deletedIndex === currentIndex && currentIndex >= words.length) {
+        setCurrentIndex(Math.max(0, words.length - 1));
+      }
+      
+      setCompletedIndices(prev => 
+        prev.filter(idx => idx < words.length).map(idx => 
+          idx > deletedIndex ? idx - 1 : idx
+        )
+      );
+      
+      setIsFlipped(false);
+    }
+    
+    previousWordIdsRef.current = currentWordIds;
+  }, [words]);
 
   const handleFlip = useCallback(() => {
     setIsFlipped(true);

@@ -91,32 +91,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const markCardCompleted = useCallback(async (mode: PracticeMode, wordId: number, isExtra = false) => {
-    if (isExtra && extraSession) {
-      const progressKey = mode === "englishToMongolian" ? "englishToMongolianProgress" : "mongolianToEnglishProgress";
-      const currentProgress = extraSession[progressKey];
-      
-      if (!currentProgress.includes(wordId)) {
+    const progressKey = mode === "englishToMongolian" ? "englishToMongolianProgress" : "mongolianToEnglishProgress";
+    
+    if (isExtra) {
+      setExtraSession(prev => {
+        if (!prev) return prev;
+        const currentProgress = prev[progressKey];
+        if (currentProgress.includes(wordId)) return prev;
+        
         const updatedSession = {
-          ...extraSession,
+          ...prev,
           [progressKey]: [...currentProgress, wordId],
         };
-        setExtraSession(updatedSession);
-        await saveExtraWordsSession(updatedSession);
-      }
+        saveExtraWordsSession(updatedSession);
+        return updatedSession;
+      });
     } else {
-      const progressKey = mode === "englishToMongolian" ? "englishToMongolianProgress" : "mongolianToEnglishProgress";
-      const currentProgress = dailyProgress[progressKey];
-      
-      if (!currentProgress.includes(wordId)) {
+      setDailyProgress(prev => {
+        const currentProgress = prev[progressKey];
+        if (currentProgress.includes(wordId)) return prev;
+        
         const updatedProgress = {
-          ...dailyProgress,
+          ...prev,
           [progressKey]: [...currentProgress, wordId],
         };
-        setDailyProgress(updatedProgress);
-        await saveDailyProgress(updatedProgress);
-      }
+        saveDailyProgress(updatedProgress);
+        return updatedProgress;
+      });
     }
-  }, [dailyProgress, extraSession]);
+  }, []);
 
   const markModeCompleted = useCallback(async (mode: PracticeMode, isExtra = false) => {
     if (isExtra && extraSession) {

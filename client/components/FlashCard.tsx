@@ -159,11 +159,26 @@ export function FlashCard({
             />
           ))}
         </View>
-        <View style={styles.backTopRow}>
+        <View style={styles.topRow}>
           <View style={[styles.labelBadge, { backgroundColor: colors.secondary }]}>
             <ThemedText style={[styles.labelText, { color: colors.primary }]}>
               {backLabel}
             </ThemedText>
+          </View>
+          <View style={styles.topRowRight}>
+            {onEditPress ? (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onEditPress();
+                }}
+                style={[styles.editButton, { backgroundColor: colors.backgroundSecondary }]}
+                hitSlop={8}
+                testID="edit-word-button-back"
+              >
+                <Feather name="edit-2" size={14} color={colors.textSecondary} />
+              </Pressable>
+            ) : null}
           </View>
         </View>
         <View style={styles.wordContainer}>
@@ -242,15 +257,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-  },
-  backTopRow: {
-    position: "absolute",
-    top: Spacing.xl,
-    left: Spacing.xl,
-    right: Spacing.xl,
-    flexDirection: "row",
-    justifyContent: "flex-start",
-    alignItems: "center",
   },
   labelBadge: {
     paddingHorizontal: Spacing.md,

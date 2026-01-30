@@ -29,11 +29,11 @@ const CARD_HEIGHT = 280;
 
 export function FlashCard({ word, mode, isFlipped, onFlip }: FlashCardProps) {
   const { theme, isDark } = useTheme();
-  const rotation = useSharedValue(0);
+  const rotation = useSharedValue(isFlipped ? 180 : 0);
 
   useEffect(() => {
     rotation.value = withTiming(isFlipped ? 180 : 0, { duration: 400 });
-  }, [isFlipped, rotation]);
+  }, [isFlipped]);
 
   const handlePress = () => {
     if (!isFlipped) {
@@ -79,7 +79,7 @@ export function FlashCard({ word, mode, isFlipped, onFlip }: FlashCardProps) {
   const colors = isDark ? Colors.dark : Colors.light;
 
   return (
-    <Pressable onPress={handlePress} style={styles.container}>
+    <Pressable onPress={handlePress} style={styles.container} testID="flashcard-pressable">
       <Animated.View
         style={[
           styles.card,

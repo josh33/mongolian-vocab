@@ -95,6 +95,9 @@ export default function PracticeScreen() {
       ? "English → Mongolian"
       : "Mongolian → English";
 
+  const isLastCard = currentIndex >= words.length - 1;
+  const buttonText = isLastCard ? "Finish" : "Next";
+
   if (!currentWord) {
     return null;
   }
@@ -125,6 +128,7 @@ export default function PracticeScreen() {
 
       <View style={styles.cardContainer}>
         <FlashCard
+          key={`${currentWord.id}-${currentIndex}`}
           word={currentWord}
           mode={mode}
           isFlipped={isFlipped}
@@ -136,6 +140,7 @@ export default function PracticeScreen() {
         <Button
           onPress={handleNext}
           disabled={!isFlipped}
+          testID={isLastCard ? "button-finish" : "button-next"}
           style={[
             styles.nextButton,
             {
@@ -145,7 +150,7 @@ export default function PracticeScreen() {
             },
           ]}
         >
-          {currentIndex < words.length - 1 ? "Next" : "Finish"}
+          {buttonText}
         </Button>
       </View>
     </View>

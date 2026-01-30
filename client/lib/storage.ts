@@ -6,6 +6,8 @@ const STORAGE_KEYS = {
   THEME_PREFERENCE: "theme_preference",
   EXTRA_WORDS_SESSION: "extra_words_session",
   WORD_CONFIDENCE: "word_confidence",
+  USER_DICTIONARY: "user_dictionary",
+  DELETED_WORD_IDS: "deleted_word_ids",
 };
 
 export type ConfidenceLevel = "learning" | "familiar" | "mastered";
@@ -147,4 +149,93 @@ export async function updateWordConfidenceLevel(
   const updated = { ...current, [wordId]: level };
   await saveWordConfidence(updated);
   return updated;
+}
+
+export interface UserDictionary {
+  words: Word[];
+  editedWords: { [id: number]: Word };
+  nextId: number;
+}
+
+export async function getUserDictionary(): Promise<UserDictionary> {
+  try {
+    const stored = await AsyncStorage.getItem(STORAGE_KEYS.USER_DICTIONARY);
+    if (stored) {
+      return JSON.parse(stored) as UserDictionary;
+    }
+    return { words: [], editedWords: {}, nextId: 1000 };
+  } catch {
+    return { words: [], editedWords: {}, nextId: 1000 };
+  }
+}
+
+export async function saveUserDictionary(dict: UserDictionary): Promise<void> {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEYS.USER_DICTIONARY, JSON.stringify(dict));
+  } catch (error) {
+    console.error("Failed to save user dictionary:", error);
+  }
+}
+
+export async function getDeletedWordIds(): Promise<number[]> {
+  try {
+    const stored = await AsyncStorage.getItem(STORAGE_KEYS.DELETED_WORD_IDS);
+    if (stored) {
+      return JSON.parse(stored) as number[];
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveDeletedWordIds(ids: number[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEYS.DELETED_WORD_IDS, JSON.stringify(ids));
+  } catch (error) {
+    console.error("Failed to save deleted word IDs:", error);
+  }
+}
+
+export async function addWord(word: Omit<Word, "id">): Promise<Word> {
+  const dict = await getUserDictionary();
+  const newWord: Word = {
+    id: dict.nextId,
+    ...word,
+  };
+  dict.words.push(newWord);
+  dict.nextId += 1;
+  await saveUserDictionary(dict);
+  return newWord;
+}
+
+export async function updateWord(word: Word): Promise<void> {
+  const dict = await getUserDictionary();
+  const userWordIndex = dict.words.findIndex((w) => w.id === word.id);
+  if (userWordIndex >= 0) {
+    dict.words[userWordIndex] = word;
+  } else {
+    dict.editedWords[word.id] = word;
+  }
+  await saveUserDictionary(dict);
+}
+
+export async function deleteWord(wordId: number): Promise<void> {
+  const dict = await getUserDictionary();
+  const userWordIndex = dict.words.findIndex((w) => w.id === wordId);
+  if (userWordIndex >= 0) {
+    dict.words.splice(userWordIndex, 1);
+    await saveUserDictionary(dict);
+  } else {
+    const deletedIds = await getDeletedWordIds();
+    if (!deletedIds.includes(wordId)) {
+      deletedIds.push(wordId);
+      await saveDeletedWordIds(deletedIds);
+    }
+  }
+  const confidence = await getWordConfidence();
+  if (confidence[wordId]) {
+    delete confidence[wordId];
+    await saveWordConfidence(confidence);
+  }
 }

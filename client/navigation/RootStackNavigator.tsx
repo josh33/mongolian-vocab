@@ -3,13 +3,16 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import MainTabNavigator from "@/navigation/MainTabNavigator";
 import PracticeScreen from "@/screens/PracticeScreen";
 import CompletionScreen from "@/screens/CompletionScreen";
+import EditWordScreen from "@/screens/EditWordScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { PracticeMode } from "@/context/AppContext";
+import { Word } from "@/data/dictionary";
 
 export type RootStackParamList = {
   Main: undefined;
   Practice: { mode: PracticeMode; isExtra: boolean };
   Completion: { mode: PracticeMode; isExtra: boolean };
+  EditWord: { word?: Word; isNew: boolean };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -41,6 +44,13 @@ export default function RootStackNavigator() {
           headerShown: false,
           gestureEnabled: false,
         }}
+      />
+      <Stack.Screen
+        name="EditWord"
+        component={EditWordScreen}
+        options={({ route }) => ({
+          headerTitle: route.params.isNew ? "Add Word" : "Edit Word",
+        })}
       />
     </Stack.Navigator>
   );

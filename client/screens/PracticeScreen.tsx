@@ -7,10 +7,9 @@ import * as Haptics from "expo-haptics";
 
 import { FlashCard } from "@/components/FlashCard";
 import { ProgressDots } from "@/components/ProgressDots";
-import { Button } from "@/components/Button";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
-import { Colors, Spacing, Shadows } from "@/constants/theme";
+import { Colors, Spacing } from "@/constants/theme";
 import { useApp, PracticeMode } from "@/context/AppContext";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { Word } from "@/data/dictionary";
@@ -56,11 +55,7 @@ export default function PracticeScreen() {
     setIsFlipped(true);
   }, []);
 
-  const handleNext = useCallback(async () => {
-    if (!isFlipped) return;
-
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
+  const handleAdvance = useCallback(async () => {
     // Mark current position as completed
     setCompletedIndices((prev) => 
       prev.includes(currentIndex) ? prev : [...prev, currentIndex]
@@ -75,7 +70,6 @@ export default function PracticeScreen() {
       navigation.replace("Completion", { mode, isExtra });
     }
   }, [
-    isFlipped,
     currentIndex,
     words.length,
     markModeCompleted,
@@ -89,9 +83,6 @@ export default function PracticeScreen() {
     mode === "englishToMongolian"
       ? "English → Mongolian"
       : "Mongolian → English";
-
-  const isLastCard = currentIndex >= words.length - 1;
-  const buttonText = isLastCard ? "Finish" : "Next";
   
   const currentConfidence = currentWord 
     ? wordConfidence[currentWord.id] || null 
@@ -145,26 +136,9 @@ export default function PracticeScreen() {
           onFlip={handleFlip}
           confidenceLevel={currentConfidence}
           onConfidenceChange={handleConfidenceChange}
+          onAdvance={handleAdvance}
           onEditPress={handleEditPress}
         />
-      </View>
-
-      <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + Spacing.xl }]}>
-        <Button
-          onPress={handleNext}
-          disabled={!isFlipped}
-          testID={isLastCard ? "button-finish" : "button-next"}
-          style={[
-            styles.nextButton,
-            {
-              backgroundColor: isFlipped ? colors.primary : colors.backgroundSecondary,
-              ...Shadows.button,
-              shadowColor: colors.primary,
-            },
-          ]}
-        >
-          {buttonText}
-        </Button>
       </View>
     </View>
   );
@@ -200,12 +174,5 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     paddingHorizontal: Spacing.lg,
-  },
-  bottomContainer: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.xl,
-  },
-  nextButton: {
-    borderRadius: 12,
   },
 });

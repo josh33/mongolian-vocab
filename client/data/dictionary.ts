@@ -13,7 +13,7 @@ export const dictionary: Word[] = [
   { id: 3, english: "Good evening", mongolian: "Оройн мэнд", pronunciation: "Oroin mend", category: "greetings" },
   { id: 4, english: "Goodbye", mongolian: "Баяртай", pronunciation: "Bayartai", category: "greetings" },
   { id: 5, english: "Thank you", mongolian: "Баярлалаа", pronunciation: "Bayarlalaa", category: "greetings" },
-  { id: 6, english: "Please", mongolian: "Гуйя", pronunciation: "Guiya", category: "greetings" },
+  { id: 6, english: "Please", mongolian: "-аарай/-ээрэй/-оорой/-өөрэй", pronunciation: "-aarai/-eerey/-ooroi/-öörey", category: "greetings" },
   { id: 7, english: "Yes", mongolian: "Тийм", pronunciation: "Tiim", category: "greetings" },
   { id: 8, english: "No", mongolian: "Үгүй", pronunciation: "Ügüi", category: "greetings" },
   { id: 9, english: "Excuse me", mongolian: "Уучлаарай", pronunciation: "Uuchlaarai", category: "greetings" },

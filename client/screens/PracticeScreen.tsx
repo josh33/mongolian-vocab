@@ -28,8 +28,6 @@ export default function PracticeScreen() {
 
   const {
     getWordsForMode,
-    getProgressForMode,
-    markCardCompleted,
     markModeCompleted,
   } = useApp();
 
@@ -41,18 +39,11 @@ export default function PracticeScreen() {
   useEffect(() => {
     const wordsForMode = getWordsForMode(mode, isExtra);
     setWords(wordsForMode);
-    
-    const existingProgress = getProgressForMode(mode, isExtra);
-    const indices = wordsForMode
-      .map((w, i) => (existingProgress.includes(w.id) ? i : -1))
-      .filter((i) => i !== -1);
-    setCompletedIndices(indices);
-    
-    const firstIncomplete = wordsForMode.findIndex(
-      (w) => !existingProgress.includes(w.id)
-    );
-    setCurrentIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
-  }, [mode, isExtra, getWordsForMode, getProgressForMode]);
+    // Always start fresh from position 0 with empty progress
+    // This ensures dots show clean 1-2-3-4-5 progression
+    setCurrentIndex(0);
+    setCompletedIndices([]);
+  }, [mode, isExtra, getWordsForMode]);
 
   const handleFlip = useCallback(() => {
     setIsFlipped(true);
@@ -63,11 +54,10 @@ export default function PracticeScreen() {
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    const currentWord = words[currentIndex];
-    if (currentWord && !completedIndices.includes(currentIndex)) {
-      await markCardCompleted(mode, currentWord.id, isExtra);
-      setCompletedIndices((prev) => [...prev, currentIndex]);
-    }
+    // Mark current position as completed
+    setCompletedIndices((prev) => 
+      prev.includes(currentIndex) ? prev : [...prev, currentIndex]
+    );
 
     if (currentIndex < words.length - 1) {
       setCurrentIndex((prev) => prev + 1);
@@ -80,9 +70,7 @@ export default function PracticeScreen() {
   }, [
     isFlipped,
     currentIndex,
-    words,
-    completedIndices,
-    markCardCompleted,
+    words.length,
     markModeCompleted,
     mode,
     isExtra,

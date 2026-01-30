@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { StyleSheet, Pressable, View, Dimensions } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -26,6 +27,7 @@ interface FlashCardProps {
   onFlip: () => void;
   confidenceLevel: ConfidenceLevel | null;
   onConfidenceChange: (level: ConfidenceLevel) => void;
+  onEditPress?: () => void;
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -38,7 +40,8 @@ export function FlashCard({
   isFlipped, 
   onFlip, 
   confidenceLevel, 
-  onConfidenceChange 
+  onConfidenceChange,
+  onEditPress,
 }: FlashCardProps) {
   const { theme, isDark } = useTheme();
   const rotation = useSharedValue(isFlipped ? 180 : 0);
@@ -104,8 +107,21 @@ export function FlashCard({
           <View style={[styles.labelBadge, { backgroundColor: colors.primary }]}>
             <ThemedText style={styles.labelText}>{frontLabel}</ThemedText>
           </View>
-          <View style={styles.confidenceContainer}>
+          <View style={styles.topRowRight}>
             <ConfidenceIndicator level={confidenceLevel} />
+            {onEditPress ? (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onEditPress();
+                }}
+                style={[styles.editButton, { backgroundColor: colors.backgroundSecondary }]}
+                hitSlop={8}
+                testID="edit-word-button"
+              >
+                <Feather name="edit-2" size={14} color={colors.textSecondary} />
+              </Pressable>
+            ) : null}
           </View>
         </View>
         <View style={styles.wordContainer}>
@@ -212,8 +228,17 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  confidenceContainer: {
-    alignItems: "flex-end",
+  topRowRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  editButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
   },
   backTopRow: {
     position: "absolute",

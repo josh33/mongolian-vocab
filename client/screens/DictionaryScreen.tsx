@@ -1,39 +1,98 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { StyleSheet, View, FlatList, TextInput, Pressable, Image } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
-import { dictionary, Word } from "@/data/dictionary";
+import { dictionary as baseDictionary, Word } from "@/data/dictionary";
+import {
+  ConfidenceLevel,
+  WordConfidence,
+  getWordConfidence,
+  getUserDictionary,
+  getDeletedWordIds,
+} from "@/lib/storage";
+import { RootStackParamList } from "@/navigation/RootStackNavigator";
+
+const CONFIDENCE_CONFIG = {
+  learning: { label: "Learning", color: "#E57373" },
+  familiar: { label: "Familiar", color: "#FFB74D" },
+  mastered: { label: "Mastered", color: "#81C784" },
+};
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function DictionaryScreen() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
+  const navigation = useNavigation<NavigationProp>();
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [wordConfidence, setWordConfidence] = useState<WordConfidence>({});
+  const [allWords, setAllWords] = useState<Word[]>(baseDictionary);
+
+  const loadData = useCallback(async () => {
+    const [confidence, userDict, deletedIds] = await Promise.all([
+      getWordConfidence(),
+      getUserDictionary(),
+      getDeletedWordIds(),
+    ]);
+
+    setWordConfidence(confidence);
+
+    const baseWords = baseDictionary
+      .filter((w) => !deletedIds.includes(w.id))
+      .map((w) => userDict.editedWords[w.id] ?? w);
+
+    const combined = [...baseWords, ...userDict.words];
+    setAllWords(combined);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   const filteredWords = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return dictionary.sort((a, b) => a.english.localeCompare(b.english));
-    }
-    const query = searchQuery.toLowerCase();
-    return dictionary
-      .filter(
+    let words = allWords;
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      words = allWords.filter(
         (word) =>
           word.english.toLowerCase().includes(query) ||
           word.mongolian.toLowerCase().includes(query) ||
           word.pronunciation.toLowerCase().includes(query)
-      )
-      .sort((a, b) => a.english.localeCompare(b.english));
-  }, [searchQuery]);
+      );
+    }
+    return words.sort((a, b) => a.english.localeCompare(b.english));
+  }, [searchQuery, allWords]);
+
+  const handleWordPress = (word: Word) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    navigation.navigate("EditWord", { word, isNew: false });
+  };
+
+  const handleAddPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    navigation.navigate("EditWord", { isNew: true });
+  };
 
   const renderItem = ({ item }: { item: Word }) => (
-    <WordRow word={item} colors={colors} />
+    <WordRow
+      word={item}
+      colors={colors}
+      confidenceLevel={wordConfidence[item.id] ?? null}
+      onPress={() => handleWordPress(item)}
+    />
   );
 
   const renderEmpty = () => (
@@ -54,7 +113,20 @@ export default function DictionaryScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.backgroundRoot }]}>
-      <View style={[styles.searchContainer, { paddingTop: insets.top + Spacing.lg }]}>
+      <View style={[styles.headerContainer, { paddingTop: insets.top + Spacing.lg }]}>
+        <View style={styles.headerRow}>
+          <ThemedText style={[styles.headerTitle, { color: colors.text }]}>
+            Dictionary
+          </ThemedText>
+          <Pressable
+            onPress={handleAddPress}
+            style={[styles.addButton, { backgroundColor: colors.secondary }]}
+            hitSlop={8}
+            testID="add-word-button"
+          >
+            <Feather name="plus" size={22} color="#FFFFFF" />
+          </Pressable>
+        </View>
         <View style={[styles.searchInputContainer, { backgroundColor: colors.backgroundDefault }]}>
           <Feather name="search" size={20} color={colors.textSecondary} />
           <TextInput
@@ -65,6 +137,7 @@ export default function DictionaryScreen() {
             onChangeText={setSearchQuery}
             autoCorrect={false}
             autoCapitalize="none"
+            testID="search-input"
           />
           {searchQuery.length > 0 ? (
             <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
@@ -95,30 +168,69 @@ export default function DictionaryScreen() {
 interface WordRowProps {
   word: Word;
   colors: typeof Colors.light;
+  confidenceLevel: ConfidenceLevel | null;
+  onPress: () => void;
 }
 
-function WordRow({ word, colors }: WordRowProps) {
+function WordRow({ word, colors, confidenceLevel, onPress }: WordRowProps) {
   return (
-    <View style={styles.wordRow}>
+    <Pressable
+      style={({ pressed }) => [
+        styles.wordRow,
+        pressed && { backgroundColor: colors.backgroundSecondary },
+      ]}
+      onPress={onPress}
+      testID={`word-row-${word.id}`}
+    >
       <View style={styles.wordContent}>
-        <ThemedText style={[styles.englishText, { color: colors.text }]}>
-          {word.english}
-        </ThemedText>
+        <View style={styles.englishRow}>
+          <ThemedText style={[styles.englishText, { color: colors.text }]}>
+            {word.english}
+          </ThemedText>
+          {confidenceLevel ? (
+            <View
+              style={[
+                styles.confidenceBadge,
+                { backgroundColor: CONFIDENCE_CONFIG[confidenceLevel].color + "20" },
+              ]}
+            >
+              <View
+                style={[
+                  styles.confidenceDot,
+                  { backgroundColor: CONFIDENCE_CONFIG[confidenceLevel].color },
+                ]}
+              />
+              <ThemedText
+                style={[
+                  styles.confidenceText,
+                  { color: CONFIDENCE_CONFIG[confidenceLevel].color },
+                ]}
+              >
+                {CONFIDENCE_CONFIG[confidenceLevel].label}
+              </ThemedText>
+            </View>
+          ) : null}
+        </View>
         <View style={styles.mongolianContainer}>
           <ThemedText style={[styles.mongolianText, { color: colors.text }]}>
             {word.mongolian}
           </ThemedText>
-          <ThemedText style={[styles.pronunciationText, { color: colors.textSecondary }]}>
-            ({word.pronunciation})
-          </ThemedText>
+          {word.pronunciation ? (
+            <ThemedText style={[styles.pronunciationText, { color: colors.textSecondary }]}>
+              ({word.pronunciation})
+            </ThemedText>
+          ) : null}
         </View>
       </View>
-      <View style={[styles.categoryBadge, { backgroundColor: colors.backgroundSecondary }]}>
-        <ThemedText style={[styles.categoryText, { color: colors.textSecondary }]}>
-          {word.category}
-        </ThemedText>
+      <View style={styles.rightContent}>
+        <View style={[styles.categoryBadge, { backgroundColor: colors.backgroundSecondary }]}>
+          <ThemedText style={[styles.categoryText, { color: colors.textSecondary }]}>
+            {word.category}
+          </ThemedText>
+        </View>
+        <Feather name="chevron-right" size={18} color={colors.textSecondary} />
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -126,9 +238,26 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  searchContainer: {
+  headerContainer: {
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+  },
+  addButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
   },
   searchInputContainer: {
     flexDirection: "row",
@@ -154,10 +283,33 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: Spacing.md,
   },
+  englishRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginBottom: Spacing.xs,
+    flexWrap: "wrap",
+  },
   englishText: {
     fontSize: 16,
     fontWeight: "600",
-    marginBottom: Spacing.xs,
+  },
+  confidenceBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.xs,
+    gap: 4,
+  },
+  confidenceDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  confidenceText: {
+    fontSize: 10,
+    fontWeight: "600",
   },
   mongolianContainer: {
     flexDirection: "row",
@@ -171,6 +323,11 @@ const styles = StyleSheet.create({
   pronunciationText: {
     fontSize: 14,
     fontStyle: "italic",
+  },
+  rightContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
   },
   categoryBadge: {
     paddingHorizontal: Spacing.sm,

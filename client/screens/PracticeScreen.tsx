@@ -103,6 +103,11 @@ export default function PracticeScreen() {
     setWordConfidence(updated);
   }, [currentWord]);
 
+  const handleEditPress = useCallback(() => {
+    if (!currentWord) return;
+    navigation.navigate("EditWord", { word: currentWord, isNew: false });
+  }, [currentWord, navigation]);
+
   if (!currentWord) {
     return null;
   }
@@ -140,6 +145,7 @@ export default function PracticeScreen() {
           onFlip={handleFlip}
           confidenceLevel={currentConfidence}
           onConfidenceChange={handleConfidenceChange}
+          onEditPress={handleEditPress}
         />
       </View>
 

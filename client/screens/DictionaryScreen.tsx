@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
-import { StyleSheet, View, FlatList, TextInput, Pressable, Image } from "react-native";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { StyleSheet, View, FlatList, TextInput, Pressable, Image, InputAccessoryView, Platform, Keyboard } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
@@ -34,6 +34,7 @@ export default function DictionaryScreen() {
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
   const navigation = useNavigation<NavigationProp>();
+  const searchInputRef = useRef<TextInput>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [wordConfidence, setWordConfidence] = useState<WordConfidence>({});
@@ -127,9 +128,13 @@ export default function DictionaryScreen() {
             <Feather name="plus" size={22} color="#FFFFFF" />
           </Pressable>
         </View>
-        <View style={[styles.searchInputContainer, { backgroundColor: colors.backgroundDefault }]}>
+        <Pressable 
+          style={[styles.searchInputContainer, { backgroundColor: colors.backgroundDefault }]}
+          onPress={() => searchInputRef.current?.focus()}
+        >
           <Feather name="search" size={20} color={colors.textSecondary} />
           <TextInput
+            ref={searchInputRef}
             style={[styles.searchInput, { color: colors.text }]}
             placeholder="Search words..."
             placeholderTextColor={colors.textSecondary}
@@ -138,14 +143,32 @@ export default function DictionaryScreen() {
             autoCorrect={false}
             autoCapitalize="none"
             testID="search-input"
+            inputAccessoryViewID={Platform.OS === "ios" ? "dictionarySearchAccessory" : undefined}
           />
           {searchQuery.length > 0 ? (
             <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
               <Feather name="x" size={20} color={colors.textSecondary} />
             </Pressable>
           ) : null}
-        </View>
+        </Pressable>
       </View>
+
+      {Platform.OS === "ios" ? (
+        <InputAccessoryView nativeID="dictionarySearchAccessory">
+          <View style={[styles.accessoryContainer, { backgroundColor: colors.backgroundSecondary }]}>
+            <Pressable
+              onPress={() => Keyboard.dismiss()}
+              style={styles.accessoryButton}
+              hitSlop={8}
+            >
+              <Feather name="chevron-down" size={20} color={colors.primary} />
+              <ThemedText style={[styles.accessoryButtonText, { color: colors.primary }]}>
+                Done
+              </ThemedText>
+            </Pressable>
+          </View>
+        </InputAccessoryView>
+      ) : null}
 
       <FlatList
         data={filteredWords}
@@ -251,6 +274,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: "700",
+    lineHeight: 36,
   },
   addButton: {
     width: 36,
@@ -271,6 +295,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     paddingVertical: 0,
+    height: "100%",
   },
   wordRow: {
     flexDirection: "row",
@@ -365,5 +390,25 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontSize: 14,
     textAlign: "center",
+  },
+  accessoryContainer: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0,0,0,0.1)",
+  },
+  accessoryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+  },
+  accessoryButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

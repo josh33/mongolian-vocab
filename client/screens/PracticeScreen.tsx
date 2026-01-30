@@ -33,6 +33,7 @@ export default function PracticeScreen() {
 
   const {
     getWordsForMode,
+    markCardCompleted,
     markModeCompleted,
   } = useApp();
 
@@ -82,7 +83,14 @@ export default function PracticeScreen() {
   }, []);
 
   const handleAdvance = useCallback(async () => {
-    // Mark current position as completed
+    const currentWord = words[currentIndex];
+    
+    // Mark current card as completed in storage for progress tracking
+    if (currentWord) {
+      await markCardCompleted(mode, currentWord.id, isExtra);
+    }
+    
+    // Mark current position as completed visually
     setCompletedIndices((prev) => 
       prev.includes(currentIndex) ? prev : [...prev, currentIndex]
     );
@@ -97,7 +105,8 @@ export default function PracticeScreen() {
     }
   }, [
     currentIndex,
-    words.length,
+    words,
+    markCardCompleted,
     markModeCompleted,
     mode,
     isExtra,
@@ -199,6 +208,8 @@ const styles = StyleSheet.create({
   cardContainer: {
     flex: 1,
     justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: Spacing.lg,
+    marginTop: -Spacing["4xl"],
   },
 });

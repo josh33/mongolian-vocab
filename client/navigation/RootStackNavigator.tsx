@@ -12,7 +12,7 @@ export type RootStackParamList = {
   Main: undefined;
   Practice: { mode: PracticeMode; isExtra: boolean };
   Completion: { mode: PracticeMode; isExtra: boolean };
-  EditWord: { word?: Word; isNew: boolean };
+  EditWord: { word?: Word; isNew: boolean; fromStudy?: boolean; isExtra?: boolean };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();

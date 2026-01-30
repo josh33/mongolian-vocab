@@ -25,6 +25,7 @@ import {
   deleteWord,
 } from "@/lib/storage";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
+import { useApp } from "@/context/AppContext";
 
 type Props = NativeStackScreenProps<RootStackParamList, "EditWord">;
 
@@ -55,11 +56,12 @@ const CONFIDENCE_CONFIG = {
 };
 
 export default function EditWordScreen({ navigation, route }: Props) {
-  const { word, isNew } = route.params;
+  const { word, isNew, fromStudy, isExtra } = route.params;
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
+  const { deleteWordDuringStudy } = useApp();
 
   const [english, setEnglish] = useState(word?.english ?? "");
   const [mongolian, setMongolian] = useState(word?.mongolian ?? "");
@@ -114,7 +116,13 @@ export default function EditWordScreen({ navigation, route }: Props) {
   const confirmDelete = async () => {
     if (!word) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    await deleteWord(word.id);
+    
+    if (fromStudy) {
+      await deleteWordDuringStudy(word.id, isExtra ?? false);
+    } else {
+      await deleteWord(word.id);
+    }
+    
     setShowDeleteModal(false);
     navigation.goBack();
   };

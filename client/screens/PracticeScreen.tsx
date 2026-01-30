@@ -96,8 +96,8 @@ export default function PracticeScreen() {
 
   const handleEditPress = useCallback(() => {
     if (!currentWord) return;
-    navigation.navigate("EditWord", { word: currentWord, isNew: false });
-  }, [currentWord, navigation]);
+    navigation.navigate("EditWord", { word: currentWord, isNew: false, fromStudy: true, isExtra });
+  }, [currentWord, navigation, isExtra]);
 
   if (!currentWord) {
     return null;

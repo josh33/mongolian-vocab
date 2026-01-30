@@ -215,8 +215,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const updatedSession: ExtraWordsSession = {
         ...extraSession,
         words: updatedWords,
-        englishToMongolianProgress: extraSession.englishToMongolianProgress.filter(id => id !== wordId),
-        mongolianToEnglishProgress: extraSession.mongolianToEnglishProgress.filter(id => id !== wordId),
       };
       
       setExtraSession(updatedSession);
@@ -234,13 +232,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       
       setDailyWords(updatedDailyWords);
       
-      const updatedProgress: DailyProgress = {
-        ...dailyProgress,
-        englishToMongolianProgress: dailyProgress.englishToMongolianProgress.filter(id => id !== wordId),
-        mongolianToEnglishProgress: dailyProgress.mongolianToEnglishProgress.filter(id => id !== wordId),
-      };
-      setDailyProgress(updatedProgress);
-      await saveDailyProgress(updatedProgress);
     }
   }, [dailyWords, dailyProgress, extraSession]);
 

@@ -65,7 +65,7 @@ export default function CompletionScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.backgroundRoot }]}>
       <View style={styles.content}>
-        <Animated.View style={imageStyle}>
+        <Animated.View style={[styles.imageContainer, imageStyle]}>
           <Image
             source={
               bothCompleted
@@ -110,10 +110,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: Spacing["2xl"],
   },
+  imageContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: Spacing.lg,
+    marginBottom: Spacing["2xl"],
+  },
   image: {
     width: 180,
     height: 180,
-    marginBottom: Spacing["2xl"],
   },
   textContainer: {
     alignItems: "center",
@@ -121,6 +126,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "700",
+    lineHeight: 36,
     marginBottom: Spacing.md,
     textAlign: "center",
   },

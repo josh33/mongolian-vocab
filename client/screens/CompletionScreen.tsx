@@ -10,16 +10,29 @@ import Animated, {
   withDelay,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
+import Svg, { Path, Circle } from "react-native-svg";
 
 import { Button } from "@/components/Button";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
-import { Colors, Spacing } from "@/constants/theme";
+import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 type CompletionRouteProp = RouteProp<RootStackParamList, "Completion">;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+function HorseIcon({ size, color }: { size: number; color: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M22 6C22 6 20.5 5 19 5C17.5 5 16 6 16 6L15 8L13 7C13 7 12 3 8 3C8 3 8 6 9 8L8 9L6 8C6 8 4 9 3 11C2 13 2 15 3 17C4 19 6 20 8 20L10 21L12 20C12 20 14 21 16 20C18 19 19 17 19 15L20 13L21 14C21 14 22 13 22 11C22 9 21 8 21 8L22 6Z"
+        fill={color}
+      />
+      <Circle cx="19" cy="6.5" r="1" fill="#FFFFFF" />
+    </Svg>
+  );
+}
 
 export default function CompletionScreen() {
   const insets = useSafeAreaInsets();
@@ -29,19 +42,24 @@ export default function CompletionScreen() {
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
 
-  const { isBothModesCompleted } = useApp();
+  const { isBothModesCompleted, lastStreakUpdate, clearLastStreakUpdate, streakData } = useApp();
   const bothCompleted = isBothModesCompleted(isExtra);
+  const showStreakUpdate = lastStreakUpdate?.streakIncremented;
 
   const scale = useSharedValue(0.5);
   const opacity = useSharedValue(0);
   const textOpacity = useSharedValue(0);
+  const streakScale = useSharedValue(0);
 
   useEffect(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     scale.value = withSpring(1, { damping: 12, stiffness: 100 });
     opacity.value = withSpring(1);
     textOpacity.value = withDelay(300, withSpring(1));
-  }, [scale, opacity, textOpacity]);
+    if (showStreakUpdate) {
+      streakScale.value = withDelay(500, withSpring(1, { damping: 10, stiffness: 80 }));
+    }
+  }, [scale, opacity, textOpacity, streakScale, showStreakUpdate]);
 
   const imageStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -52,7 +70,13 @@ export default function CompletionScreen() {
     opacity: textOpacity.value,
   }));
 
+  const streakStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: streakScale.value }],
+    opacity: streakScale.value,
+  }));
+
   const handleContinue = () => {
+    clearLastStreakUpdate();
     navigation.popToTop();
     navigation.navigate("Main");
   };
@@ -88,6 +112,24 @@ export default function CompletionScreen() {
                 : "You've completed both modes for today. Outstanding work!"
               : `You've finished ${modeLabel}. Keep going!`}
           </ThemedText>
+
+          {showStreakUpdate ? (
+            <Animated.View style={[styles.streakContainer, { backgroundColor: colors.backgroundSecondary }, streakStyle]}>
+              <HorseIcon size={28} color={colors.secondary} />
+              <View style={styles.streakTextContainer}>
+                <ThemedText style={[styles.streakTitle, { color: colors.secondary }]}>
+                  {lastStreakUpdate.usedFreeze ? "Streak Saved!" : `${streakData.currentStreak} Day Streak!`}
+                </ThemedText>
+                <ThemedText style={[styles.streakSubtitle, { color: colors.textSecondary }]}>
+                  {lastStreakUpdate.usedFreeze 
+                    ? "You used your streak freeze" 
+                    : lastStreakUpdate.streakBroken 
+                      ? "Starting a new streak!" 
+                      : "Keep the momentum going!"}
+                </ThemedText>
+              </View>
+            </Animated.View>
+          ) : null}
         </Animated.View>
       </View>
 
@@ -134,6 +176,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: "center",
     lineHeight: 24,
+  },
+  streakContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+    marginTop: Spacing["2xl"],
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.md,
+  },
+  streakTextContainer: {
+    flex: 1,
+  },
+  streakTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  streakSubtitle: {
+    fontSize: 14,
+    marginTop: 2,
   },
   bottomContainer: {
     paddingHorizontal: Spacing.lg,

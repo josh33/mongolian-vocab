@@ -10,6 +10,7 @@ const STORAGE_KEYS = {
   DELETED_WORD_IDS: "deleted_word_ids",
   BUNDLE_APPLIED: "word_bundle_applied",
   BUNDLE_DISMISSED: "word_bundle_dismissed",
+  STREAK_DATA: "streak_data",
 };
 
 export type ConfidenceLevel = "learning" | "familiar" | "mastered";
@@ -340,4 +341,217 @@ export async function applyWordBundle(
   await markBundleApplied(bundle.bundleId);
 
   return { added, skipped };
+}
+
+export type DayStatus = "completed" | "paused" | "missed" | "pending" | "future";
+
+export interface DayRecord {
+  date: string;
+  status: DayStatus;
+  wordsCompleted: number;
+}
+
+export interface StreakData {
+  currentStreak: number;
+  longestStreak: number;
+  lastCompletedDate: string | null;
+  streakFreezeAvailable: boolean;
+  streakFreezeUsedDate: string | null;
+  history: DayRecord[];
+}
+
+function getDateString(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function getDefaultStreakData(): StreakData {
+  return {
+    currentStreak: 0,
+    longestStreak: 0,
+    lastCompletedDate: null,
+    streakFreezeAvailable: true,
+    streakFreezeUsedDate: null,
+    history: [],
+  };
+}
+
+export async function getStreakData(): Promise<StreakData> {
+  try {
+    const stored = await AsyncStorage.getItem(STORAGE_KEYS.STREAK_DATA);
+    if (stored) {
+      return JSON.parse(stored) as StreakData;
+    }
+    return getDefaultStreakData();
+  } catch {
+    return getDefaultStreakData();
+  }
+}
+
+export async function saveStreakData(data: StreakData): Promise<void> {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEYS.STREAK_DATA, JSON.stringify(data));
+  } catch (error) {
+    console.error("Failed to save streak data:", error);
+  }
+}
+
+function daysBetween(date1: string, date2: string): number {
+  const d1 = new Date(date1);
+  const d2 = new Date(date2);
+  const diffTime = Math.abs(d2.getTime() - d1.getTime());
+  return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+}
+
+function isYesterday(dateString: string): boolean {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  return getDateString(yesterday) === dateString;
+}
+
+function isToday(dateString: string): boolean {
+  return getDateString(new Date()) === dateString;
+}
+
+export async function checkAndUpdateStreak(wordsCompletedToday: number): Promise<{
+  streakIncremented: boolean;
+  streakBroken: boolean;
+  usedFreeze: boolean;
+  newStreak: number;
+}> {
+  const data = await getStreakData();
+  const today = getDateString(new Date());
+  
+  const existingTodayRecord = data.history.find(h => h.date === today);
+  if (existingTodayRecord && existingTodayRecord.status === "completed") {
+    existingTodayRecord.wordsCompleted = Math.max(existingTodayRecord.wordsCompleted, wordsCompletedToday);
+    await saveStreakData(data);
+    return {
+      streakIncremented: false,
+      streakBroken: false,
+      usedFreeze: false,
+      newStreak: data.currentStreak,
+    };
+  }
+  
+  const minWordsRequired = 5;
+  const didCompleteToday = wordsCompletedToday >= minWordsRequired;
+  
+  if (!didCompleteToday) {
+    return {
+      streakIncremented: false,
+      streakBroken: false,
+      usedFreeze: false,
+      newStreak: data.currentStreak,
+    };
+  }
+  
+  let streakIncremented = false;
+  let streakBroken = false;
+  let usedFreeze = false;
+  
+  if (data.lastCompletedDate === null) {
+    data.currentStreak = 1;
+    streakIncremented = true;
+  } else if (isToday(data.lastCompletedDate)) {
+    // Already completed today, just update word count
+  } else if (isYesterday(data.lastCompletedDate)) {
+    data.currentStreak += 1;
+    streakIncremented = true;
+  } else {
+    const daysMissed = daysBetween(data.lastCompletedDate, today);
+    
+    if (daysMissed === 2 && data.streakFreezeAvailable && wordsCompletedToday >= 10) {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = getDateString(yesterday);
+      
+      data.history.push({
+        date: yesterdayStr,
+        status: "paused",
+        wordsCompleted: 0,
+      });
+      
+      data.streakFreezeAvailable = false;
+      data.streakFreezeUsedDate = yesterdayStr;
+      data.currentStreak += 1;
+      usedFreeze = true;
+      streakIncremented = true;
+    } else {
+      data.currentStreak = 1;
+      streakBroken = true;
+      streakIncremented = true;
+    }
+  }
+  
+  if (existingTodayRecord) {
+    existingTodayRecord.status = "completed";
+    existingTodayRecord.wordsCompleted = wordsCompletedToday;
+  } else {
+    data.history.push({
+      date: today,
+      status: "completed",
+      wordsCompleted: wordsCompletedToday,
+    });
+  }
+  
+  data.lastCompletedDate = today;
+  
+  if (data.currentStreak > data.longestStreak) {
+    data.longestStreak = data.currentStreak;
+  }
+  
+  const maxHistoryDays = 30;
+  if (data.history.length > maxHistoryDays) {
+    data.history = data.history.slice(-maxHistoryDays);
+  }
+  
+  await saveStreakData(data);
+  
+  return {
+    streakIncremented,
+    streakBroken,
+    usedFreeze,
+    newStreak: data.currentStreak,
+  };
+}
+
+export function getWeekDays(referenceDate: Date = new Date()): { date: string; dayLabel: string }[] {
+  const days: { date: string; dayLabel: string }[] = [];
+  const dayLabels = ["S", "M", "T", "W", "T", "F", "S"];
+  
+  const startOfWeek = new Date(referenceDate);
+  const currentDay = startOfWeek.getDay();
+  startOfWeek.setDate(startOfWeek.getDate() - currentDay);
+  
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(startOfWeek);
+    day.setDate(startOfWeek.getDate() + i);
+    days.push({
+      date: getDateString(day),
+      dayLabel: dayLabels[i],
+    });
+  }
+  
+  return days;
+}
+
+export function getDayStatus(dateString: string, streakData: StreakData): DayStatus {
+  const today = getDateString(new Date());
+  const todayDate = new Date();
+  const checkDate = new Date(dateString);
+  
+  if (checkDate > todayDate && dateString !== today) {
+    return "future";
+  }
+  
+  const record = streakData.history.find(h => h.date === dateString);
+  if (record) {
+    return record.status;
+  }
+  
+  if (dateString === today) {
+    return "pending";
+  }
+  
+  return "missed";
 }

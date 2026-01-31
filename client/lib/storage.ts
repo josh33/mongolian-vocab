@@ -228,6 +228,19 @@ export async function updateWord(word: Word): Promise<void> {
   await saveUserDictionary(dict);
 }
 
+export async function getUpdatedWord(wordId: number, baseWord: Word): Promise<Word> {
+  const dict = await getUserDictionary();
+  const userWord = dict.words.find((w) => w.id === wordId);
+  if (userWord) {
+    return userWord;
+  }
+  const editedWord = dict.editedWords[wordId];
+  if (editedWord) {
+    return editedWord;
+  }
+  return baseWord;
+}
+
 export async function deleteWord(wordId: number): Promise<void> {
   const dict = await getUserDictionary();
   const userWordIndex = dict.words.findIndex((w) => w.id === wordId);

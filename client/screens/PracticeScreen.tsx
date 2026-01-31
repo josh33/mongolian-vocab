@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { StyleSheet, View, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as Haptics from "expo-haptics";
 
@@ -17,7 +17,8 @@ import {
   ConfidenceLevel, 
   WordConfidence, 
   getWordConfidence, 
-  updateWordConfidenceLevel 
+  updateWordConfidenceLevel,
+  getUpdatedWord
 } from "@/lib/storage";
 
 type PracticeRouteProp = RouteProp<RootStackParamList, "Practice">;
@@ -37,12 +38,36 @@ export default function PracticeScreen() {
     markModeCompleted,
   } = useApp();
 
-  const words = useMemo(() => getWordsForMode(mode, isExtra), [getWordsForMode, mode, isExtra]);
+  const initialWords = useMemo(() => getWordsForMode(mode, isExtra), [getWordsForMode, mode, isExtra]);
+  const [words, setWords] = useState<Word[]>(initialWords);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [completedIndices, setCompletedIndices] = useState<number[]>([]);
   const [wordConfidence, setWordConfidence] = useState<WordConfidence>({});
   const previousWordIdsRef = useRef<Set<number>>(new Set());
+
+  useEffect(() => {
+    setWords(initialWords);
+  }, [initialWords]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const refreshCurrentWord = async () => {
+        if (words.length > 0 && currentIndex < words.length) {
+          const currentWord = words[currentIndex];
+          const updatedWord = await getUpdatedWord(currentWord.id, currentWord);
+          if (
+            updatedWord.mongolian !== currentWord.mongolian ||
+            updatedWord.english !== currentWord.english ||
+            updatedWord.pronunciation !== currentWord.pronunciation
+          ) {
+            setWords(prev => prev.map(w => w.id === updatedWord.id ? updatedWord : w));
+          }
+        }
+      };
+      refreshCurrentWord();
+    }, [currentIndex, words])
+  );
 
   useEffect(() => {
     setCurrentIndex(0);

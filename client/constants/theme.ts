@@ -29,7 +29,7 @@ export const Colors = {
     backgroundDefault: "#1E2A3A",
     backgroundSecondary: "#2A3644",
     backgroundTertiary: "#364250",
-    primary: "#1B3A6B",
+    primary: "rgb(250, 200, 10)",
     secondary: "#D4AF37",
     success: "#10B981",
     patternAccent: "#C1664F",

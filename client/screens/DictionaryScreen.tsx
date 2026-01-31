@@ -55,7 +55,11 @@ export default function DictionaryScreen() {
       .filter((w) => !deletedIds.includes(w.id))
       .map((w) => userDict.editedWords[w.id] ?? w);
 
-    const combined = [...baseWords, ...packWords, ...userDict.words];
+    const packWordsMerged = packWords
+      .filter((w) => !deletedIds.includes(w.id))
+      .map((w) => userDict.editedWords[w.id] ?? w);
+
+    const combined = [...baseWords, ...packWordsMerged, ...userDict.words];
     setAllWords(combined);
   }, []);
 

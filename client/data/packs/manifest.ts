@@ -11,7 +11,7 @@ export interface DictionaryPackMeta {
 export const PACKS: DictionaryPackMeta[] = [
   {
     id: "animals",
-    version: 1,
+    version: 2,
     title: "Animals Pack",
     description: "Common animal vocabulary with 15 essential words.",
     wordCount: 15,

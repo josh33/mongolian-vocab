@@ -15,7 +15,7 @@ import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { bundledWordBundles } from "@/data/bundles";
-import { getBundleAppliedMap, getBundleDismissedMap } from "@/lib/storage";
+import { getBundleAppliedMap, getBundleDismissedMap, resetTodayProgress } from "@/lib/storage";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -24,7 +24,7 @@ export default function SettingsScreen() {
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
 
-  const { themePreference, setThemePreference } = useApp();
+  const { themePreference, setThemePreference, refreshStreakData } = useApp();
   const [pendingBundleCount, setPendingBundleCount] = useState(0);
 
   useFocusEffect(
@@ -55,6 +55,12 @@ export default function SettingsScreen() {
   const handleDictionaryUpdates = () => {
     Haptics.selectionAsync();
     navigation.navigate("DictionaryUpdates");
+  };
+
+  const handleResetToday = async () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    await resetTodayProgress();
+    await refreshStreakData();
   };
 
   const appVersion = Constants.expoConfig?.version ?? "1.0.0";
@@ -108,6 +114,23 @@ export default function SettingsScreen() {
             ) : null}
           </View>
           <Feather name="chevron-right" size={20} color={colors.textSecondary} />
+        </Pressable>
+      </View>
+
+      <ThemedText style={[styles.sectionTitle, { color: colors.textSecondary, marginTop: Spacing["2xl"] }]}>
+        Debug
+      </ThemedText>
+
+      <View style={[styles.settingsCard, { backgroundColor: colors.backgroundDefault }]}>
+        <Pressable
+          style={styles.settingRow}
+          onPress={handleResetToday}
+          testID="reset-today-button"
+        >
+          <ThemedText style={[styles.settingLabel, { color: colors.patternAccent }]}>
+            Reset Today's Progress
+          </ThemedText>
+          <Feather name="refresh-cw" size={20} color={colors.patternAccent} />
         </Pressable>
       </View>
 

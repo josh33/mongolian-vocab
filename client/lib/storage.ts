@@ -417,6 +417,51 @@ export async function saveStreakData(data: StreakData): Promise<void> {
   }
 }
 
+export async function resetTodayProgress(): Promise<void> {
+  try {
+    const today = getDateString(new Date());
+    
+    await AsyncStorage.removeItem(STORAGE_KEYS.DAILY_PROGRESS);
+    await AsyncStorage.removeItem(STORAGE_KEYS.EXTRA_WORDS_SESSION);
+    
+    const streakData = await getStreakData();
+    streakData.history = streakData.history.filter(h => h.date !== today);
+    
+    if (streakData.lastCompletedDate === today) {
+      const previousDates = streakData.history
+        .filter(h => h.status === "completed")
+        .map(h => h.date)
+        .sort()
+        .reverse();
+      streakData.lastCompletedDate = previousDates.length > 0 ? previousDates[0] : null;
+      
+      let streak = 0;
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = getDateString(yesterday);
+      
+      if (streakData.history.find(h => h.date === yesterdayStr && h.status === "completed")) {
+        for (let i = 0; i < streakData.history.length; i++) {
+          const checkDate = new Date();
+          checkDate.setDate(checkDate.getDate() - 1 - i);
+          const checkDateStr = getDateString(checkDate);
+          const entry = streakData.history.find(h => h.date === checkDateStr);
+          if (entry && (entry.status === "completed" || entry.status === "paused")) {
+            streak++;
+          } else {
+            break;
+          }
+        }
+      }
+      streakData.currentStreak = streak;
+    }
+    
+    await saveStreakData(streakData);
+  } catch (error) {
+    console.error("Failed to reset today's progress:", error);
+  }
+}
+
 function daysBetween(date1: string, date2: string): number {
   const d1 = new Date(date1);
   const d2 = new Date(date2);

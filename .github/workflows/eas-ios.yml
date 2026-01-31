@@ -28,7 +28,7 @@ jobs:
       - name: EAS build (iOS preview)
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas build -p ios --profile preview --non-interactive
+        run: eas build -p ios --profile preview --non-interactive  --no-wait
 
   ios-production:
     if: startsWith(github.ref, 'refs/tags/v')

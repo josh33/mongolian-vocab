@@ -1,0 +1,327 @@
+Below is a “copy/paste” spec you can hand to Replit. It’s written to match your current architecture (static base dictionary + AsyncStorage user overlays + optional word packs UI).
+
+⸻
+
+Goal
+
+Implement Expo OTA (EAS Update) so updates apply automatically (no manual “check for updates”) and we can ship new dictionary packs over time without App Store review delays.
+
+Key requirements:
+	•	OTA applies automatically on app launch (and/or when app comes to foreground).
+	•	Dictionary packs are bundled with the JS update (no external content server).
+	•	User’s personal dictionary edits/additions are never overwritten.
+	•	New packs appear in “Dictionary Updates” screen and can be accepted/rejected.
+	•	Packs can be updated later (versioned) and offered as optional upgrades.
+
+⸻
+
+1) Install + configure EAS Update
+
+Dependencies
+
+Add:
+	•	expo-updates
+
+Command:
+
+npx expo install expo-updates
+
+Configure EAS Update
+
+Run:
+
+npx eas update:configure
+
+This should:
+	•	add "expo-updates" config automatically
+	•	update native projects behind the scenes during EAS build
+
+⸻
+
+2) app.json settings for automatic OTA
+
+In app.json, add/update the following under "expo":
+
+{
+  "updates": {
+    "enabled": true,
+    "checkAutomatically": "ON_LOAD",
+    "fallbackToCacheTimeout": 0
+  },
+  "runtimeVersion": {
+    "policy": "appVersion"
+  }
+}
+
+What this does
+	•	ON_LOAD + fallbackToCacheTimeout: 0 => app loads immediately, then pulls updates in the background, and will apply on next launch (or we can force reload in JS).
+	•	runtimeVersion policy appVersion => OTA updates only apply to the same native binary version (safe). If we ship a new native build (permissions, native libs), old binaries won’t apply incompatible OTA updates.
+
+Note: if you prefer to apply updates immediately without requiring relaunch, we’ll add JS code to download + reload when available (below).
+
+⸻
+
+3) Add auto-update logic in JS (download + reload)
+
+Create a file: client/lib/otaUpdates.ts
+
+import * as Updates from "expo-updates";
+import { AppState } from "react-native";
+
+let hasCheckedThisSession = false;
+
+export async function checkAndApplyOTAUpdate(): Promise<void> {
+  try {
+    // Avoid repeated checks in a single session
+    if (hasCheckedThisSession) return;
+    hasCheckedThisSession = true;
+
+    // Only runs in production builds. In dev (Expo Go), this often no-ops.
+    const update = await Updates.checkForUpdateAsync();
+    if (update.isAvailable) {
+      await Updates.fetchUpdateAsync();
+      // Apply immediately
+      await Updates.reloadAsync();
+    }
+  } catch {
+    // swallow errors (no disruption)
+  }
+}
+
+/**
+ * Optional: also check whenever the app becomes active (foreground).
+ * Good for users who keep the app open a lot.
+ */
+export function registerOTAAppStateListener() {
+  AppState.addEventListener("change", (state) => {
+    if (state === "active") {
+      hasCheckedThisSession = false;
+      checkAndApplyOTAUpdate();
+    }
+  });
+}
+
+Then call it once at app startup. Example in App.tsx or client/App.tsx (wherever your root component is):
+
+import React, { useEffect } from "react";
+import { checkAndApplyOTAUpdate, registerOTAAppStateListener } from "@/lib/otaUpdates";
+
+export default function App() {
+  useEffect(() => {
+    // Apply OTA automatically
+    checkAndApplyOTAUpdate();
+    registerOTAAppStateListener();
+  }, []);
+
+  return (/* your existing app */);
+}
+
+
+⸻
+
+4) Setup channels/branches
+
+We want:
+	•	preview channel for internal testing
+	•	production channel for App Store/TestFlight users
+
+eas.json (build profiles)
+
+Ensure build profiles set a channel (only required if you actually use channels):
+
+{
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview"
+    },
+    "production": {
+      "channel": "production",
+      "autoIncrement": false
+    }
+  }
+}
+
+How updates get published
+	•	Preview updates: eas update --channel preview --message "..."
+	•	Production updates: eas update --channel production --message "..."
+
+Important: OTA only works in EAS-built binaries (not Expo Go).
+
+⸻
+
+5) Dictionary packs structure (bundled content)
+
+Create folder:
+	•	client/data/packs/
+
+Add a “manifest” describing packs and versioning:
+
+client/data/packs/manifest.ts
+
+export type PackId = string;
+
+export interface DictionaryPackMeta {
+  id: PackId;            // e.g. "animals"
+  version: number;       // increments when pack content changes
+  title: string;         // "Animals Pack"
+  description: string;   // shown in UI
+  wordCount: number;
+}
+
+export const PACKS: DictionaryPackMeta[] = [
+  {
+    id: "animals",
+    version: 1,
+    title: "Animals Pack",
+    description: "Common animal vocabulary with 15 essential words.",
+    wordCount: 15
+  }
+];
+
+Then each pack has its bundled word list (TS or JSON). Example:
+
+client/data/packs/animals.v1.ts
+
+import type { Word } from "@/data/dictionary";
+
+export const animals_v1: Word[] = [
+  // IMPORTANT: use IDs in a dedicated range so they never collide
+  // Example range: 20000-29999 reserved for packs
+  { id: 20001, english: "Dog", mongolian: "Нохой", pronunciation: "Nokhoi", category: "animals" },
+  // ...
+];
+
+And a pack registry for loading by id+version:
+
+client/data/packs/index.ts
+
+import type { Word } from "@/data/dictionary";
+import { animals_v1 } from "./animals.v1";
+
+export function getPackWords(packId: string, version: number): Word[] {
+  if (packId === "animals" && version === 1) return animals_v1;
+  return [];
+}
+
+
+⸻
+
+6) Persist which packs are “accepted”
+
+Add AsyncStorage key:
+	•	ACCEPTED_PACKS
+
+In client/lib/storage.ts, extend:
+
+const STORAGE_KEYS = {
+  // existing keys...
+  ACCEPTED_PACKS: "accepted_packs"
+};
+
+Add helpers:
+
+export type AcceptedPack = { id: string; version: number };
+
+export async function getAcceptedPacks(): Promise<AcceptedPack[]> {
+  const raw = await AsyncStorage.getItem(STORAGE_KEYS.ACCEPTED_PACKS);
+  return raw ? (JSON.parse(raw) as AcceptedPack[]) : [];
+}
+
+export async function saveAcceptedPacks(packs: AcceptedPack[]): Promise<void> {
+  await AsyncStorage.setItem(STORAGE_KEYS.ACCEPTED_PACKS, JSON.stringify(packs));
+}
+
+
+⸻
+
+7) Merge packs into the dictionary without overwriting user edits
+
+When loading the dictionary screen, after you merge:
+	•	base dictionary
+	•	deleted IDs
+	•	editedWords overrides
+	•	user-added words
+
+…also merge pack words if accepted.
+
+Implement a function:
+
+import { getAcceptedPacks } from "@/lib/storage";
+import { getPackWords } from "@/data/packs";
+
+export async function getAcceptedPackWords(): Promise<Word[]> {
+  const accepted = await getAcceptedPacks();
+  const all: Word[] = [];
+  for (const p of accepted) {
+    all.push(...getPackWords(p.id, p.version));
+  }
+  return all;
+}
+
+Then in DictionaryScreen.loadData():
+	•	compute baseWords the same way
+	•	compute userWords (existing)
+	•	compute packWords (new)
+	•	final:
+
+const combined = [...baseWords, ...packWords, ...userDict.words];
+
+Important rule: user edits always win:
+	•	If a pack word shares an id with base/user (it shouldn’t if we reserve ID ranges), it becomes tricky.
+	•	So: reserve ID ranges for packs.
+
+Recommended ID ranges:
+	•	Base dictionary: 1-9999 (you currently use <1000)
+	•	User-added: 10000-19999 (or keep 1000+ if you like)
+	•	Pack words: 20000-29999
+	•	Future expansions: 30000+
+
+⸻
+
+8) “Dictionary Updates” UI behavior
+
+The UI should show:
+	•	packs from manifest (PACKS)
+	•	whether each pack is accepted (by id+version)
+	•	action buttons:
+	•	Preview (shows word list)
+	•	Add (marks accepted)
+	•	Dismiss (optional: hide pack suggestion for now)
+
+Also support pack upgrades:
+	•	if accepted has animals@1 but manifest has animals@2, show “Update” button
+
+⸻
+
+9) OTA + Packs flow (how you’ll ship new packs)
+
+When you create a new pack:
+	1.	Add new pack file travel.v1.ts
+	2.	Add entry to manifest PACKS
+	3.	Publish OTA update to production channel:
+
+eas update --channel production --message "Added Travel Pack"
+
+Users will automatically receive it on next launch (and your JS will auto-reload if available).
+
+⸻
+
+10) What Replit should NOT do
+	•	Do not host packs on a remote server.
+	•	Do not overwrite USER_DICTIONARY, DELETED_WORD_IDS, or WORD_CONFIDENCE during updates.
+	•	Packs must be additive and only inserted after user acceptance.
+
+⸻
+
+Quick validation checklist
+	•	Production EAS build has expo-updates installed ✅
+	•	app.json has updates + runtimeVersion ✅
+	•	App startup checks OTA + reloads if available ✅
+	•	Packs are bundled TS/JSON files ✅
+	•	Accepted packs stored in AsyncStorage ✅
+	•	Dictionary screen merges packs after base edits and before user-added words ✅
+
+⸻
+
+If you want, paste your current eas.json and the file where your app root initializes (App.tsx / index.js), and I’ll tailor the exact diffs to match your project layout.

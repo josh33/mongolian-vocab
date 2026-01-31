@@ -7,6 +7,10 @@ on:
       - "v*"
   workflow_dispatch:
 
+concurrency:
+  group: eas-ios-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ios-preview:
     if: github.ref_type == 'branch'
@@ -46,6 +50,17 @@ jobs:
 
       - name: Install EAS CLI
         run: npm install -g eas-cli
+
+      - name: Set iOS build number from GitHub run number
+        run: |
+          node -e "
+            const fs=require('fs');
+            const p='app.json';
+            const j=JSON.parse(fs.readFileSync(p,'utf8'));
+            j.expo.ios = j.expo.ios || {};
+            j.expo.ios.buildNumber = String(process.env.GITHUB_RUN_NUMBER);
+            fs.writeFileSync(p, JSON.stringify(j, null, 2));
+          "
 
       - name: EAS build (iOS production)
         env:

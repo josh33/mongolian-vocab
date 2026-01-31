@@ -11,6 +11,8 @@ const STORAGE_KEYS = {
   BUNDLE_APPLIED: "word_bundle_applied",
   BUNDLE_DISMISSED: "word_bundle_dismissed",
   STREAK_DATA: "streak_data",
+  ACCEPTED_PACKS: "accepted_packs",
+  DISMISSED_PACKS: "dismissed_packs",
 };
 
 export type ConfidenceLevel = "learning" | "familiar" | "mastered";
@@ -621,4 +623,75 @@ export function getDayStatus(dateString: string, streakData: StreakData): DaySta
   }
   
   return "missed";
+}
+
+export type AcceptedPack = { id: string; version: number };
+
+export async function getAcceptedPacks(): Promise<AcceptedPack[]> {
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_KEYS.ACCEPTED_PACKS);
+    return raw ? (JSON.parse(raw) as AcceptedPack[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveAcceptedPacks(packs: AcceptedPack[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEYS.ACCEPTED_PACKS, JSON.stringify(packs));
+  } catch (error) {
+    console.error("Failed to save accepted packs:", error);
+  }
+}
+
+export async function acceptPack(packId: string, version: number): Promise<void> {
+  const packs = await getAcceptedPacks();
+  const existingIndex = packs.findIndex((p) => p.id === packId);
+  if (existingIndex >= 0) {
+    packs[existingIndex].version = version;
+  } else {
+    packs.push({ id: packId, version });
+  }
+  await saveAcceptedPacks(packs);
+}
+
+export async function isPackAccepted(packId: string): Promise<AcceptedPack | null> {
+  const packs = await getAcceptedPacks();
+  return packs.find((p) => p.id === packId) ?? null;
+}
+
+export type DismissedPack = { id: string; version: number; timestamp: number };
+
+export async function getDismissedPacks(): Promise<DismissedPack[]> {
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_KEYS.DISMISSED_PACKS);
+    return raw ? (JSON.parse(raw) as DismissedPack[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveDismissedPacks(packs: DismissedPack[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEYS.DISMISSED_PACKS, JSON.stringify(packs));
+  } catch (error) {
+    console.error("Failed to save dismissed packs:", error);
+  }
+}
+
+export async function dismissPack(packId: string, version: number): Promise<void> {
+  const packs = await getDismissedPacks();
+  const existingIndex = packs.findIndex((p) => p.id === packId);
+  if (existingIndex >= 0) {
+    packs[existingIndex] = { id: packId, version, timestamp: Date.now() };
+  } else {
+    packs.push({ id: packId, version, timestamp: Date.now() });
+  }
+  await saveDismissedPacks(packs);
+}
+
+export async function isPackDismissed(packId: string, version: number): Promise<boolean> {
+  const packs = await getDismissedPacks();
+  const dismissed = packs.find((p) => p.id === packId);
+  return dismissed ? dismissed.version === version : false;
 }

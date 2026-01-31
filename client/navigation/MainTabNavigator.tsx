@@ -3,14 +3,19 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Platform, StyleSheet } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import TodayScreen from "@/screens/TodayScreen";
 import DictionaryScreen from "@/screens/DictionaryScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
 import { useTheme } from "@/hooks/useTheme";
-import { Colors } from "@/constants/theme";
+import { Colors, Spacing } from "@/constants/theme";
 import { HeaderTitle } from "@/components/HeaderTitle";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
+import { StreakBadge } from "@/components/StreakBadge";
+import { useApp } from "@/context/AppContext";
+import { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 export type MainTabParamList = {
   TodayTab: undefined;
@@ -19,6 +24,19 @@ export type MainTabParamList = {
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
+
+function StreakHeaderButton() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { streakData } = useApp();
+
+  return (
+    <StreakBadge
+      count={streakData.currentStreak}
+      onPress={() => navigation.navigate("Streak")}
+      size="medium"
+    />
+  );
+}
 
 export default function MainTabNavigator() {
   const { isDark } = useTheme();
@@ -57,6 +75,8 @@ export default function MainTabNavigator() {
         options={{
           title: "Today",
           headerTitle: () => <HeaderTitle title="Mongolian Vocab" />,
+          headerRight: () => <StreakHeaderButton />,
+          headerRightContainerStyle: { paddingRight: Spacing.lg },
           tabBarIcon: ({ color, size }) => (
             <Feather name="calendar" size={size} color={color} />
           ),

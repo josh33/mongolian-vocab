@@ -5,6 +5,7 @@ import PracticeScreen from "@/screens/PracticeScreen";
 import CompletionScreen from "@/screens/CompletionScreen";
 import EditWordScreen from "@/screens/EditWordScreen";
 import DictionaryUpdatesScreen from "@/screens/DictionaryUpdatesScreen";
+import StreakScreen from "@/screens/StreakScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { PracticeMode } from "@/context/AppContext";
 import { Word } from "@/data/dictionary";
@@ -15,6 +16,7 @@ export type RootStackParamList = {
   Completion: { mode: PracticeMode; isExtra: boolean };
   EditWord: { word?: Word; isNew: boolean; fromStudy?: boolean; isExtra?: boolean };
   DictionaryUpdates: undefined;
+  Streak: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -59,6 +61,14 @@ export default function RootStackNavigator() {
         component={DictionaryUpdatesScreen}
         options={{
           headerTitle: "Dictionary Updates",
+        }}
+      />
+      <Stack.Screen
+        name="Streak"
+        component={StreakScreen}
+        options={{
+          presentation: "fullScreenModal",
+          headerShown: false,
         }}
       />
     </Stack.Navigator>

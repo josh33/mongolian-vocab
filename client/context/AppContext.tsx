@@ -3,6 +3,7 @@ import { Word, getDailyWords, dictionary, shuffleArray } from "@/data/dictionary
 import {
   DailyProgress,
   ExtraWordsSession,
+  StreakData,
   getDailyProgress,
   saveDailyProgress,
   getExtraWordsSession,
@@ -13,14 +14,25 @@ import {
   deleteWord,
   getDeletedWordIds,
   getUserDictionary,
+  getStreakData,
+  checkAndUpdateStreak,
 } from "@/lib/storage";
 
 export type PracticeMode = "englishToMongolian" | "mongolianToEnglish";
+
+interface StreakUpdateResult {
+  streakIncremented: boolean;
+  streakBroken: boolean;
+  usedFreeze: boolean;
+  newStreak: number;
+}
 
 interface AppContextType {
   dailyWords: Word[];
   dailyProgress: DailyProgress;
   extraSession: ExtraWordsSession | null;
+  streakData: StreakData;
+  lastStreakUpdate: StreakUpdateResult | null;
   themePreference: "light" | "dark" | "system";
   isLoading: boolean;
   setThemePreference: (theme: "light" | "dark" | "system") => Promise<void>;
@@ -33,6 +45,8 @@ interface AppContextType {
   requestNewWords: () => Promise<void>;
   hasExtraSession: boolean;
   refreshProgress: () => Promise<void>;
+  refreshStreakData: () => Promise<void>;
+  clearLastStreakUpdate: () => void;
   deleteWordDuringStudy: (wordId: number, isExtra: boolean) => Promise<void>;
 }
 
@@ -48,6 +62,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     mongolianToEnglishProgress: [],
   });
   const [extraSession, setExtraSession] = useState<ExtraWordsSession | null>(null);
+  const [streakData, setStreakData] = useState<StreakData>({
+    currentStreak: 0,
+    longestStreak: 0,
+    lastCompletedDate: null,
+    streakFreezeAvailable: true,
+    streakFreezeUsedDate: null,
+    history: [],
+  });
+  const [lastStreakUpdate, setLastStreakUpdate] = useState<StreakUpdateResult | null>(null);
   const [themePreference, setThemePref] = useState<"light" | "dark" | "system">("system");
   const [isLoading, setIsLoading] = useState(true);
   const isInitialLoadRef = useRef(true);
@@ -55,10 +78,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [progress, extra, theme] = await Promise.all([
+      const [progress, extra, theme, streak] = await Promise.all([
         getDailyProgress(),
         getExtraWordsSession(),
         getThemePreference(),
+        getStreakData(),
       ]);
       
       const words = getDailyWords(new Date(), 5);
@@ -66,6 +90,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setDailyProgress(progress);
       setExtraSession(extra);
       setThemePref(theme);
+      setStreakData(streak);
     } catch (error) {
       console.error("Failed to load data:", error);
     } finally {
@@ -100,6 +125,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     ]);
     setDailyProgress(progress);
     setExtraSession(extra);
+  }, []);
+
+  const refreshStreakData = useCallback(async () => {
+    const streak = await getStreakData();
+    setStreakData(streak);
+  }, []);
+
+  const clearLastStreakUpdate = useCallback(() => {
+    setLastStreakUpdate(null);
   }, []);
 
   const setThemePreference = useCallback(async (theme: "light" | "dark" | "system") => {
@@ -151,7 +185,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
         [completedKey]: true,
       }));
     }
-  }, []);
+    
+    const currentDailyProgress = dailyProgress;
+    const currentExtraSession = extraSession;
+    
+    let totalWordsCompletedToday = 0;
+    
+    if (isExtra && currentExtraSession) {
+      totalWordsCompletedToday = Math.max(
+        currentExtraSession.englishToMongolianProgress.length,
+        currentExtraSession.mongolianToEnglishProgress.length
+      );
+    }
+    
+    totalWordsCompletedToday += Math.max(
+      currentDailyProgress.englishToMongolianProgress.length,
+      currentDailyProgress.mongolianToEnglishProgress.length
+    );
+    
+    if (totalWordsCompletedToday >= 5) {
+      const result = await checkAndUpdateStreak(totalWordsCompletedToday);
+      setLastStreakUpdate(result);
+      await refreshStreakData();
+    }
+  }, [dailyProgress, extraSession, refreshStreakData]);
 
   const getWordsForMode = useCallback((mode: PracticeMode, isExtra = false): Word[] => {
     const words = isExtra && extraSession ? extraSession.words : dailyWords;
@@ -258,6 +315,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dailyWords,
     dailyProgress,
     extraSession,
+    streakData,
+    lastStreakUpdate,
     themePreference,
     isLoading,
     setThemePreference,
@@ -270,6 +329,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     requestNewWords,
     hasExtraSession: extraSession !== null,
     refreshProgress,
+    refreshStreakData,
+    clearLastStreakUpdate,
     deleteWordDuringStudy,
   };
 

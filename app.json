@@ -2,18 +2,19 @@
   "expo": {
     "name": "Mongolian Vocab",
     "slug": "mongolian-vocab",
-    "version": "1.0.9",
+    "version": "1.0.10",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "mongolianvocab",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.mongolianvocab.app",
-      "buildNumber": "9",
+      "buildNumber": "10",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIDeviceFamily": [1]
       }
     },
     "android": {

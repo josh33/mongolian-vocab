@@ -16,20 +16,23 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
-import { bundledWordBundles, WordBundle } from "@/data/bundles";
+import { PACKS, DictionaryPackMeta, getPackWords } from "@/data/packs";
 import {
-  getBundleAppliedMap,
-  getBundleDismissedMap,
-  applyWordBundle,
-  markBundleDismissed,
-  BundleStateMap,
+  getAcceptedPacks,
+  getDismissedPacks,
+  acceptPack,
+  dismissPack,
+  AcceptedPack,
+  DismissedPack,
 } from "@/lib/storage";
+import type { Word } from "@/data/dictionary";
 
-type BundleStatus = "pending" | "applied" | "dismissed";
+type PackStatus = "pending" | "accepted" | "dismissed" | "upgrade_available";
 
-interface BundleWithStatus {
-  bundle: WordBundle;
-  status: BundleStatus;
+interface PackWithStatus {
+  pack: DictionaryPackMeta;
+  status: PackStatus;
+  acceptedVersion?: number;
 }
 
 export default function DictionaryUpdatesScreen() {
@@ -38,125 +41,153 @@ export default function DictionaryUpdatesScreen() {
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
 
-  const [bundlesWithStatus, setBundlesWithStatus] = useState<BundleWithStatus[]>([]);
+  const [packsWithStatus, setPacksWithStatus] = useState<PackWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
-  const [previewBundle, setPreviewBundle] = useState<WordBundle | null>(null);
+  const [previewPack, setPreviewPack] = useState<DictionaryPackMeta | null>(null);
+  const [previewWords, setPreviewWords] = useState<Word[]>([]);
   const [applyingId, setApplyingId] = useState<string | null>(null);
-  const [lastResult, setLastResult] = useState<{ added: number; skipped: number } | null>(null);
+  const [lastResult, setLastResult] = useState<{ packTitle: string; wordCount: number } | null>(null);
 
-  const loadBundles = useCallback(async () => {
+  const loadPacks = useCallback(async () => {
     try {
-      const [appliedMap, dismissedMap] = await Promise.all([
-        getBundleAppliedMap(),
-        getBundleDismissedMap(),
+      const [acceptedPacks, dismissedPacks] = await Promise.all([
+        getAcceptedPacks(),
+        getDismissedPacks(),
       ]);
 
-      const withStatus: BundleWithStatus[] = bundledWordBundles.map((bundle) => {
-        let status: BundleStatus = "pending";
-        if (appliedMap[bundle.bundleId]) {
-          status = "applied";
-        } else if (dismissedMap[bundle.bundleId]) {
+      const withStatus: PackWithStatus[] = PACKS.map((pack) => {
+        const accepted = acceptedPacks.find((a) => a.id === pack.id);
+        const dismissed = dismissedPacks.find((d) => d.id === pack.id);
+
+        let status: PackStatus = "pending";
+        let acceptedVersion: number | undefined;
+
+        if (accepted) {
+          acceptedVersion = accepted.version;
+          if (accepted.version < pack.version) {
+            status = "upgrade_available";
+          } else {
+            status = "accepted";
+          }
+        } else if (dismissed && dismissed.version === pack.version) {
           status = "dismissed";
         }
-        return { bundle, status };
+
+        return { pack, status, acceptedVersion };
       });
 
-      setBundlesWithStatus(withStatus);
+      setPacksWithStatus(withStatus);
     } catch (error) {
-      console.error("Failed to load bundles:", error);
+      console.error("Failed to load packs:", error);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadBundles();
-  }, [loadBundles]);
+    loadPacks();
+  }, [loadPacks]);
 
-  const handleApply = async (bundle: WordBundle) => {
+  const handleAccept = async (pack: DictionaryPackMeta) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setApplyingId(bundle.bundleId);
+    setApplyingId(pack.id);
     try {
-      const result = await applyWordBundle(bundle);
-      setLastResult(result);
-      await loadBundles();
+      await acceptPack(pack.id, pack.version);
+      setLastResult({ packTitle: pack.title, wordCount: pack.wordCount });
+      await loadPacks();
       setTimeout(() => setLastResult(null), 3000);
     } catch (error) {
-      console.error("Failed to apply bundle:", error);
+      console.error("Failed to accept pack:", error);
     } finally {
       setApplyingId(null);
     }
   };
 
-  const handleDismiss = async (bundle: WordBundle) => {
+  const handleDismiss = async (pack: DictionaryPackMeta) => {
     Haptics.selectionAsync();
     try {
-      await markBundleDismissed(bundle.bundleId);
-      await loadBundles();
+      await dismissPack(pack.id, pack.version);
+      await loadPacks();
     } catch (error) {
-      console.error("Failed to dismiss bundle:", error);
+      console.error("Failed to dismiss pack:", error);
     }
   };
 
-  const handlePreview = (bundle: WordBundle) => {
+  const handlePreview = (pack: DictionaryPackMeta) => {
     Haptics.selectionAsync();
-    setPreviewBundle(bundle);
+    const words = getPackWords(pack.id, pack.version);
+    setPreviewWords(words);
+    setPreviewPack(pack);
   };
 
-  const pendingBundles = bundlesWithStatus.filter((b) => b.status === "pending");
-  const appliedBundles = bundlesWithStatus.filter((b) => b.status === "applied");
-  const dismissedBundles = bundlesWithStatus.filter((b) => b.status === "dismissed");
+  const pendingPacks = packsWithStatus.filter((p) => p.status === "pending");
+  const upgradePacks = packsWithStatus.filter((p) => p.status === "upgrade_available");
+  const acceptedPacks = packsWithStatus.filter((p) => p.status === "accepted");
+  const dismissedPacks = packsWithStatus.filter((p) => p.status === "dismissed");
 
-  const renderBundleItem = ({ item }: { item: BundleWithStatus }) => {
-    const { bundle, status } = item;
-    const isApplying = applyingId === bundle.bundleId;
+  const renderPackItem = ({ item }: { item: PackWithStatus }) => {
+    const { pack, status, acceptedVersion } = item;
+    const isApplying = applyingId === pack.id;
 
     return (
       <View
-        style={[styles.bundleCard, { backgroundColor: colors.backgroundDefault }]}
-        testID={`bundle-card-${bundle.bundleId}`}
+        style={[styles.packCard, { backgroundColor: colors.backgroundDefault }]}
+        testID={`pack-card-${pack.id}`}
       >
-        <View style={styles.bundleHeader}>
-          <View style={styles.bundleInfo}>
-            <ThemedText style={[styles.bundleTitle, { color: colors.text }]}>
-              {bundle.title}
-            </ThemedText>
-            <ThemedText style={[styles.bundleWordCount, { color: colors.textSecondary }]}>
-              {bundle.words.length} words
+        <View style={styles.packHeader}>
+          <View style={styles.packInfo}>
+            <View style={styles.titleRow}>
+              <ThemedText style={[styles.packTitle, { color: colors.text }]}>
+                {pack.title}
+              </ThemedText>
+              <ThemedText style={[styles.versionBadge, { color: colors.textSecondary }]}>
+                v{pack.version}
+              </ThemedText>
+            </View>
+            <ThemedText style={[styles.packWordCount, { color: colors.textSecondary }]}>
+              {pack.wordCount} words
             </ThemedText>
           </View>
-          {status === "applied" && (
+          {status === "accepted" ? (
             <View style={[styles.statusBadge, { backgroundColor: colors.success + "20" }]}>
               <Feather name="check-circle" size={14} color={colors.success} />
               <ThemedText style={[styles.statusText, { color: colors.success }]}>
                 Added
               </ThemedText>
             </View>
-          )}
-          {status === "dismissed" && (
+          ) : null}
+          {status === "upgrade_available" ? (
+            <View style={[styles.statusBadge, { backgroundColor: colors.warning + "20" }]}>
+              <Feather name="arrow-up-circle" size={14} color={colors.warning} />
+              <ThemedText style={[styles.statusText, { color: colors.warning }]}>
+                Update v{acceptedVersion} → v{pack.version}
+              </ThemedText>
+            </View>
+          ) : null}
+          {status === "dismissed" ? (
             <View style={[styles.statusBadge, { backgroundColor: colors.textSecondary + "20" }]}>
               <ThemedText style={[styles.statusText, { color: colors.textSecondary }]}>
                 Dismissed
               </ThemedText>
             </View>
-          )}
+          ) : null}
         </View>
 
-        {bundle.description ? (
+        {pack.description ? (
           <ThemedText
-            style={[styles.bundleDescription, { color: colors.textSecondary }]}
+            style={[styles.packDescription, { color: colors.textSecondary }]}
             numberOfLines={2}
           >
-            {bundle.description}
+            {pack.description}
           </ThemedText>
         ) : null}
 
-        {status === "pending" ? (
+        {status === "pending" || status === "upgrade_available" ? (
           <View style={styles.buttonRow}>
             <Pressable
               style={[styles.previewButton, { borderColor: colors.primary }]}
-              onPress={() => handlePreview(bundle)}
-              testID={`preview-button-${bundle.bundleId}`}
+              onPress={() => handlePreview(pack)}
+              testID={`preview-button-${pack.id}`}
             >
               <Feather name="eye" size={16} color={colors.primary} />
               <ThemedText style={[styles.previewButtonText, { color: colors.primary }]}>
@@ -165,23 +196,25 @@ export default function DictionaryUpdatesScreen() {
             </Pressable>
             <Pressable
               style={[styles.addButton, { backgroundColor: colors.primary }]}
-              onPress={() => handleApply(bundle)}
+              onPress={() => handleAccept(pack)}
               disabled={isApplying}
-              testID={`add-button-${bundle.bundleId}`}
+              testID={`add-button-${pack.id}`}
             >
               {isApplying ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
                 <>
-                  <Feather name="plus" size={16} color="#FFFFFF" />
-                  <ThemedText style={styles.addButtonText}>Add</ThemedText>
+                  <Feather name={status === "upgrade_available" ? "arrow-up" : "plus"} size={16} color="#FFFFFF" />
+                  <ThemedText style={styles.addButtonText}>
+                    {status === "upgrade_available" ? "Update" : "Add"}
+                  </ThemedText>
                 </>
               )}
             </Pressable>
             <Pressable
               style={[styles.dismissButton, { backgroundColor: colors.backgroundSecondary }]}
-              onPress={() => handleDismiss(bundle)}
-              testID={`dismiss-button-${bundle.bundleId}`}
+              onPress={() => handleDismiss(pack)}
+              testID={`dismiss-button-${pack.id}`}
             >
               <Feather name="x" size={16} color={colors.textSecondary} />
             </Pressable>
@@ -191,16 +224,16 @@ export default function DictionaryUpdatesScreen() {
     );
   };
 
-  const renderSection = (title: string, bundles: BundleWithStatus[]) => {
-    if (bundles.length === 0) return null;
+  const renderSection = (title: string, packs: PackWithStatus[]) => {
+    if (packs.length === 0) return null;
 
     return (
       <View style={styles.section}>
         <ThemedText style={[styles.sectionTitle, { color: colors.textSecondary }]}>
           {title}
         </ThemedText>
-        {bundles.map((item) => (
-          <View key={item.bundle.bundleId}>{renderBundleItem({ item })}</View>
+        {packs.map((item) => (
+          <View key={item.pack.id}>{renderPackItem({ item })}</View>
         ))}
       </View>
     );
@@ -233,13 +266,15 @@ export default function DictionaryUpdatesScreen() {
               >
                 <Feather name="check-circle" size={18} color={colors.success} />
                 <ThemedText style={[styles.resultText, { color: colors.success }]}>
-                  Added {lastResult.added} words
-                  {lastResult.skipped > 0 ? ` (${lastResult.skipped} already existed)` : ""}
+                  {lastResult.packTitle} added ({lastResult.wordCount} words)
                 </ThemedText>
               </View>
             ) : null}
 
-            {pendingBundles.length === 0 && appliedBundles.length === 0 && dismissedBundles.length === 0 ? (
+            {pendingPacks.length === 0 &&
+            upgradePacks.length === 0 &&
+            acceptedPacks.length === 0 &&
+            dismissedPacks.length === 0 ? (
               <View style={styles.emptyState}>
                 <Feather name="inbox" size={48} color={colors.textSecondary} />
                 <ThemedText style={[styles.emptyTitle, { color: colors.text }]}>
@@ -251,9 +286,10 @@ export default function DictionaryUpdatesScreen() {
               </View>
             ) : (
               <>
-                {renderSection("Available Packs", pendingBundles)}
-                {renderSection("Added to Dictionary", appliedBundles)}
-                {renderSection("Dismissed", dismissedBundles)}
+                {renderSection("Updates Available", upgradePacks)}
+                {renderSection("Available Packs", pendingPacks)}
+                {renderSection("Added to Dictionary", acceptedPacks)}
+                {renderSection("Dismissed", dismissedPacks)}
               </>
             )}
           </View>
@@ -262,18 +298,23 @@ export default function DictionaryUpdatesScreen() {
       />
 
       <Modal
-        visible={previewBundle !== null}
+        visible={previewPack !== null}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setPreviewBundle(null)}
+        onRequestClose={() => setPreviewPack(null)}
       >
         <View style={[styles.modalContainer, { backgroundColor: colors.backgroundRoot }]}>
           <View style={[styles.modalHeader, { borderBottomColor: colors.backgroundSecondary }]}>
-            <ThemedText style={[styles.modalTitle, { color: colors.text }]}>
-              {previewBundle?.title}
-            </ThemedText>
+            <View>
+              <ThemedText style={[styles.modalTitle, { color: colors.text }]}>
+                {previewPack?.title}
+              </ThemedText>
+              <ThemedText style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
+                Version {previewPack?.version}
+              </ThemedText>
+            </View>
             <Pressable
-              onPress={() => setPreviewBundle(null)}
+              onPress={() => setPreviewPack(null)}
               style={styles.closeButton}
               testID="close-preview-button"
             >
@@ -282,7 +323,7 @@ export default function DictionaryUpdatesScreen() {
           </View>
 
           <FlatList
-            data={previewBundle?.words ?? []}
+            data={previewWords}
             keyExtractor={(item) => item.id.toString()}
             contentContainerStyle={{ padding: Spacing.lg, paddingBottom: insets.bottom + 100 }}
             renderItem={({ item }) => (
@@ -302,7 +343,7 @@ export default function DictionaryUpdatesScreen() {
             )}
           />
 
-          {previewBundle ? (
+          {previewPack ? (
             <View
               style={[
                 styles.modalFooter,
@@ -315,14 +356,14 @@ export default function DictionaryUpdatesScreen() {
               <Pressable
                 style={[styles.modalAddButton, { backgroundColor: colors.primary }]}
                 onPress={() => {
-                  handleApply(previewBundle);
-                  setPreviewBundle(null);
+                  handleAccept(previewPack);
+                  setPreviewPack(null);
                 }}
                 testID="modal-add-button"
               >
                 <Feather name="plus" size={18} color="#FFFFFF" />
                 <ThemedText style={styles.modalAddButtonText}>
-                  Add {previewBundle.words.length} Words to Dictionary
+                  Add {previewPack.wordCount} Words to Dictionary
                 </ThemedText>
               </Pressable>
             </View>
@@ -352,28 +393,37 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
     marginLeft: Spacing.sm,
   },
-  bundleCard: {
+  packCard: {
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
     marginBottom: Spacing.md,
   },
-  bundleHeader: {
+  packHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
-  bundleInfo: {
+  packInfo: {
     flex: 1,
   },
-  bundleTitle: {
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  packTitle: {
     fontSize: 18,
     fontWeight: "600",
-    marginBottom: Spacing.xs,
   },
-  bundleWordCount: {
+  versionBadge: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  packWordCount: {
     fontSize: 14,
+    marginTop: Spacing.xs,
   },
-  bundleDescription: {
+  packDescription: {
     fontSize: 14,
     marginTop: Spacing.sm,
     lineHeight: 20,
@@ -461,7 +511,7 @@ const styles = StyleSheet.create({
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
@@ -469,6 +519,10 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: "600",
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    marginTop: 2,
   },
   closeButton: {
     padding: Spacing.xs,

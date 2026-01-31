@@ -18,6 +18,7 @@ import {
   getUserDictionary,
   getDeletedWordIds,
 } from "@/lib/storage";
+import { getAcceptedPackWords } from "@/lib/packWords";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 const CONFIDENCE_CONFIG = {
@@ -41,10 +42,11 @@ export default function DictionaryScreen() {
   const [allWords, setAllWords] = useState<Word[]>(baseDictionary);
 
   const loadData = useCallback(async () => {
-    const [confidence, userDict, deletedIds] = await Promise.all([
+    const [confidence, userDict, deletedIds, packWords] = await Promise.all([
       getWordConfidence(),
       getUserDictionary(),
       getDeletedWordIds(),
+      getAcceptedPackWords(),
     ]);
 
     setWordConfidence(confidence);
@@ -53,7 +55,7 @@ export default function DictionaryScreen() {
       .filter((w) => !deletedIds.includes(w.id))
       .map((w) => userDict.editedWords[w.id] ?? w);
 
-    const combined = [...baseWords, ...userDict.words];
+    const combined = [...baseWords, ...packWords, ...userDict.words];
     setAllWords(combined);
   }, []);
 

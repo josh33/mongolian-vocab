@@ -28,6 +28,7 @@ export interface DailyProgress {
 
 export interface ExtraWordsSession {
   sessionId: string;
+  date: string;
   words: Word[];
   englishToMongolianCompleted: boolean;
   mongolianToEnglishCompleted: boolean;
@@ -79,7 +80,11 @@ export async function getExtraWordsSession(): Promise<ExtraWordsSession | null> 
   try {
     const stored = await AsyncStorage.getItem(STORAGE_KEYS.EXTRA_WORDS_SESSION);
     if (stored) {
-      return JSON.parse(stored) as ExtraWordsSession;
+      const session = JSON.parse(stored) as ExtraWordsSession;
+      if (session.date === getTodayString()) {
+        return session;
+      }
+      await AsyncStorage.removeItem(STORAGE_KEYS.EXTRA_WORDS_SESSION);
     }
     return null;
   } catch {

@@ -195,8 +195,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const availableWords = dictionary.filter(w => !existingIds.has(w.id));
     const newWords = shuffleArray(availableWords, Date.now()).slice(0, 5);
     
+    const today = new Date();
+    const dateString = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
+    
     const newSession: ExtraWordsSession = {
       sessionId: Date.now().toString(),
+      date: dateString,
       words: newWords,
       englishToMongolianCompleted: false,
       mongolianToEnglishCompleted: false,

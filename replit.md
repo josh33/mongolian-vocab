@@ -30,7 +30,19 @@ Preferred communication style: Simple, everyday language.
 - The dictionary is embedded client-side with 60+ words across categories (greetings, numbers, family, nature)
 - **Confidence Scoring**: Each word can have a confidence level (learning/familiar/mastered) that persists across sessions
 - **Dictionary Management**: Users can add, edit, and delete words via the EditWord screen. Changes persist in AsyncStorage (userAddedWords, editedWords, deletedWordIds)
-- **Dictionary Bundles**: Optional vocabulary packs that ship with app updates. Users can preview, accept, or dismiss bundles from Settings → Dictionary Updates. Bundle words use IDs >= 100000 to avoid collisions with base dictionary (1-999) and user-added words (1000-99999). Bundle state tracked via AsyncStorage (word_bundle_applied, word_bundle_dismissed)
+- **Dictionary Packs (Versioned)**: Vocabulary packs with version support, delivered via OTA updates. Located in `client/data/packs/`. Features:
+  - Pack manifest (`manifest.ts`) defines available packs with id, version, title, description, wordCount
+  - Pack words use IDs >= 200000 to avoid collisions with base dictionary (1-999), user-added (1000-99999), and legacy bundles (100000+)
+  - Users can preview, accept, or dismiss packs from Settings → Dictionary Updates
+  - Version tracking enables pack upgrades when new versions ship via OTA
+  - Accepted packs stored in AsyncStorage (`accepted_packs` key with array of {id, version})
+  - Dismissed packs stored separately with version to re-show when upgraded
+- **OTA Updates**: Automatic over-the-air updates via expo-updates. Configured in app.json with:
+  - `checkAutomatically: "ON_LOAD"` - checks on app launch
+  - `fallbackToCacheTimeout: 0` - loads immediately, applies update on next launch
+  - `runtimeVersion.policy: "appVersion"` - OTA only for same native version
+  - App also checks for updates when returning to foreground (via AppState listener)
+  - Logic in `client/lib/otaUpdates.ts`
 - **Streak System**: Chess.com-inspired daily streak tracking with Mongolian horse icon. Users must practice 5 words/day minimum to maintain streaks. Features:
   - Streak badge in Today screen header (tappable to view details)
   - StreakScreen modal with current streak, weekly calendar, and streak freeze status
@@ -59,6 +71,7 @@ Preferred communication style: Simple, everyday language.
 - **expo-haptics**: Tactile feedback for card interactions
 - **expo-blur**: iOS-style blur effects for navigation bars
 - **expo-splash-screen**: Controlled splash screen display during font loading
+- **expo-updates**: Over-the-air updates for EAS-built binaries
 - **@react-native-async-storage/async-storage**: Local data persistence for progress and preferences
 
 ### Development Environment

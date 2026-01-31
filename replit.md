@@ -31,6 +31,12 @@ Preferred communication style: Simple, everyday language.
 - **Confidence Scoring**: Each word can have a confidence level (learning/familiar/mastered) that persists across sessions
 - **Dictionary Management**: Users can add, edit, and delete words via the EditWord screen. Changes persist in AsyncStorage (userAddedWords, editedWords, deletedWordIds)
 - **Dictionary Bundles**: Optional vocabulary packs that ship with app updates. Users can preview, accept, or dismiss bundles from Settings → Dictionary Updates. Bundle words use IDs >= 100000 to avoid collisions with base dictionary (1-999) and user-added words (1000-99999). Bundle state tracked via AsyncStorage (word_bundle_applied, word_bundle_dismissed)
+- **Streak System**: Chess.com-inspired daily streak tracking with Mongolian horse icon. Users must practice 5 words/day minimum to maintain streaks. Features:
+  - Streak badge in Today screen header (tappable to view details)
+  - StreakScreen modal with current streak, weekly calendar, and streak freeze status
+  - Weekly streak freeze: allows recovery by practicing 10 words the next day (resets each Sunday)
+  - Streak celebration on CompletionScreen when streak is incremented
+  - History stored in AsyncStorage with date-based tracking
 
 ### Key Design Patterns
 - **Path Aliases**: `@/` maps to `./client`, `@shared/` maps to `./shared`

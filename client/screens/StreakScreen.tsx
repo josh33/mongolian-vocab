@@ -1,9 +1,9 @@
 import React from "react";
-import { StyleSheet, View, Pressable, ScrollView } from "react-native";
+import { StyleSheet, View, Pressable, ScrollView, Image } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import Svg, { Path, Circle, Defs, LinearGradient, Stop, Rect } from "react-native-svg";
+import Svg, { Defs, LinearGradient, Stop, Rect, Circle, Path } from "react-native-svg";
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -19,26 +19,9 @@ import { useApp } from "@/context/AppContext";
 import { getWeekDays, getDayStatus, DayStatus } from "@/lib/storage";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+import horseArcherImage from "../../assets/images/horse-archer.png";
 
-function LargeHorseIcon({ size, color }: { size: number; color: string }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 64 64" fill="none">
-      <Defs>
-        <LinearGradient id="horseGrad" x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0%" stopColor={color} stopOpacity="1" />
-          <Stop offset="100%" stopColor={color} stopOpacity="0.8" />
-        </LinearGradient>
-      </Defs>
-      <Circle cx="32" cy="32" r="30" fill="url(#horseGrad)" opacity="0.15" />
-      <Path
-        d="M52 16C52 16 48.5 14 46 14C43.5 14 40 16 40 16L38 20L34 18C34 18 32 8 22 8C22 8 22 16 24 20L22 22L18 20C18 20 14 22 11 26C8 30 8 36 11 42C14 48 18 52 24 52L28 54L34 52C34 52 38 54 42 52C46 50 49 44 49 38L51 34L54 36C54 36 56 34 56 30C56 26 54 22 54 22L52 16Z"
-        fill={color}
-      />
-      <Circle cx="46" cy="18" r="2.5" fill="#FFFFFF" />
-    </Svg>
-  );
-}
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 function SunOverSteppe({ width, color }: { width: number; color: string }) {
   return (
@@ -197,7 +180,16 @@ export default function StreakScreen() {
       >
         <Animated.View style={[styles.mainContent, animatedStyle]}>
           <View style={styles.iconContainer}>
-            <LargeHorseIcon size={100} color={hasActiveStreak ? colors.secondary : colors.textSecondary} />
+            <View style={[styles.iconBackground, { backgroundColor: hasActiveStreak ? `${colors.secondary}20` : `${colors.textSecondary}10` }]}>
+              <Image
+                source={horseArcherImage}
+                style={[
+                  styles.horseImage,
+                  { tintColor: hasActiveStreak ? colors.secondary : colors.textSecondary },
+                ]}
+                resizeMode="contain"
+              />
+            </View>
           </View>
 
           <ThemedText style={[styles.streakCount, { color: colors.text }]}>
@@ -288,6 +280,17 @@ const styles = StyleSheet.create({
   iconContainer: {
     marginTop: Spacing["3xl"],
     marginBottom: Spacing.xl,
+  },
+  iconBackground: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  horseImage: {
+    width: 80,
+    height: 80,
   },
   streakCount: {
     fontSize: 32,

@@ -4,6 +4,7 @@ import MainTabNavigator from "@/navigation/MainTabNavigator";
 import PracticeScreen from "@/screens/PracticeScreen";
 import CompletionScreen from "@/screens/CompletionScreen";
 import EditWordScreen from "@/screens/EditWordScreen";
+import DictionaryUpdatesScreen from "@/screens/DictionaryUpdatesScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { PracticeMode } from "@/context/AppContext";
 import { Word } from "@/data/dictionary";
@@ -13,6 +14,7 @@ export type RootStackParamList = {
   Practice: { mode: PracticeMode; isExtra: boolean };
   Completion: { mode: PracticeMode; isExtra: boolean };
   EditWord: { word?: Word; isNew: boolean; fromStudy?: boolean; isExtra?: boolean };
+  DictionaryUpdates: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -51,6 +53,13 @@ export default function RootStackNavigator() {
         options={({ route }) => ({
           headerTitle: route.params.isNew ? "Add Word" : "Edit Word",
         })}
+      />
+      <Stack.Screen
+        name="DictionaryUpdates"
+        component={DictionaryUpdatesScreen}
+        options={{
+          headerTitle: "Dictionary Updates",
+        }}
       />
     </Stack.Navigator>
   );

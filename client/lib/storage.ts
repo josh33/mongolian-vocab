@@ -8,6 +8,8 @@ const STORAGE_KEYS = {
   WORD_CONFIDENCE: "word_confidence",
   USER_DICTIONARY: "user_dictionary",
   DELETED_WORD_IDS: "deleted_word_ids",
+  BUNDLE_APPLIED: "word_bundle_applied",
+  BUNDLE_DISMISSED: "word_bundle_dismissed",
 };
 
 export type ConfidenceLevel = "learning" | "familiar" | "mastered";
@@ -161,7 +163,13 @@ export async function getUserDictionary(): Promise<UserDictionary> {
   try {
     const stored = await AsyncStorage.getItem(STORAGE_KEYS.USER_DICTIONARY);
     if (stored) {
-      return JSON.parse(stored) as UserDictionary;
+      const dict = JSON.parse(stored) as UserDictionary;
+      const userCreatedIds = dict.words
+        .map((w) => w.id)
+        .filter((id) => id >= 1000 && id < 100000);
+      const maxUserCreatedId = userCreatedIds.length > 0 ? Math.max(...userCreatedIds) : 999;
+      dict.nextId = Math.max(dict.nextId ?? 1000, maxUserCreatedId + 1);
+      return dict;
     }
     return { words: [], editedWords: {}, nextId: 1000 };
   } catch {
@@ -238,4 +246,80 @@ export async function deleteWord(wordId: number): Promise<void> {
     delete confidence[wordId];
     await saveWordConfidence(confidence);
   }
+}
+
+export type BundleStateMap = Record<string, number>;
+
+async function getBundleMap(key: string): Promise<BundleStateMap> {
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as BundleStateMap) : {};
+  } catch {
+    return {};
+  }
+}
+
+async function setBundleMap(key: string, map: BundleStateMap): Promise<void> {
+  try {
+    await AsyncStorage.setItem(key, JSON.stringify(map));
+  } catch (error) {
+    console.error("Failed to save bundle map:", error);
+  }
+}
+
+export async function getBundleAppliedMap(): Promise<BundleStateMap> {
+  return getBundleMap(STORAGE_KEYS.BUNDLE_APPLIED);
+}
+
+export async function getBundleDismissedMap(): Promise<BundleStateMap> {
+  return getBundleMap(STORAGE_KEYS.BUNDLE_DISMISSED);
+}
+
+export async function markBundleApplied(bundleId: string): Promise<void> {
+  const map = await getBundleAppliedMap();
+  map[bundleId] = Date.now();
+  await setBundleMap(STORAGE_KEYS.BUNDLE_APPLIED, map);
+}
+
+export async function markBundleDismissed(bundleId: string): Promise<void> {
+  const map = await getBundleDismissedMap();
+  map[bundleId] = Date.now();
+  await setBundleMap(STORAGE_KEYS.BUNDLE_DISMISSED, map);
+}
+
+export type WordBundle = {
+  bundleId: string;
+  title: string;
+  description?: string;
+  words: Word[];
+};
+
+export async function applyWordBundle(
+  bundle: WordBundle
+): Promise<{ added: number; skipped: number }> {
+  const dict = await getUserDictionary();
+  const existingIds = new Set(dict.words.map((w) => w.id));
+
+  let added = 0;
+  let skipped = 0;
+
+  for (const w of bundle.words) {
+    if (w.id < 100000) {
+      console.warn(`Skipping word with invalid bundle ID ${w.id} (must be >= 100000)`);
+      skipped++;
+      continue;
+    }
+    if (existingIds.has(w.id)) {
+      skipped++;
+      continue;
+    }
+    dict.words.push(w);
+    existingIds.add(w.id);
+    added++;
+  }
+
+  await saveUserDictionary(dict);
+  await markBundleApplied(bundle.bundleId);
+
+  return { added, skipped };
 }

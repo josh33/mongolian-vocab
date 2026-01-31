@@ -375,11 +375,33 @@ function getDefaultStreakData(): StreakData {
   };
 }
 
+function isSameWeek(date1: string, date2: string): boolean {
+  const d1 = new Date(date1);
+  const d2 = new Date(date2);
+  
+  const getWeekStart = (d: Date) => {
+    const day = d.getDay();
+    const diff = d.getDate() - day;
+    return new Date(d.getFullYear(), d.getMonth(), diff).getTime();
+  };
+  
+  return getWeekStart(d1) === getWeekStart(d2);
+}
+
 export async function getStreakData(): Promise<StreakData> {
   try {
     const stored = await AsyncStorage.getItem(STORAGE_KEYS.STREAK_DATA);
     if (stored) {
-      return JSON.parse(stored) as StreakData;
+      const data = JSON.parse(stored) as StreakData;
+      
+      const today = getDateString(new Date());
+      if (data.streakFreezeUsedDate && !isSameWeek(data.streakFreezeUsedDate, today)) {
+        data.streakFreezeAvailable = true;
+        data.streakFreezeUsedDate = null;
+        await saveStreakData(data);
+      }
+      
+      return data;
     }
     return getDefaultStreakData();
   } catch {

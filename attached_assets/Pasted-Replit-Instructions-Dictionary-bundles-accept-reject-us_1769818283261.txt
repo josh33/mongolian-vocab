@@ -1,0 +1,267 @@
+Replit Instructions: Dictionary bundles + accept/reject, using current Word + AsyncStorage
+Summary of the existing system (do not change)
+
+Base dictionary: client/data/dictionary.ts exports dictionary: Word[] with IDs starting at 1 (and currently < 1000).
+
+User changes are stored in AsyncStorage:
+
+USER_DICTIONARY (user_dictionary) stores:
+
+words: Word[] for user-added words (IDs start at 1000 via nextId)
+
+editedWords: { [id: number]: Word } for edits to base words
+
+nextId: number
+
+DELETED_WORD_IDS stores base-word deletions
+
+Dictionary display merges:
+
+base words (minus deleted) + edited overrides + userDict.words
+
+Goal: Add optional word “bundles” shipped with new app versions that users can accept/reject, without ever overwriting user changes.
+
+Part A — Choose an ID strategy that won’t collide
+Constraints
+
+Base words use IDs like 1,2,3... (currently < 1000)
+
+User-added words use IDs from nextId starting at 1000
+
+Decision: reserve a high ID range for bundled words
+
+Bundle word IDs: >= 100000 (stable IDs)
+
+User-added words remain 1000..99999
+
+This ensures:
+
+bundles never collide with user-created IDs
+
+bundles can be applied once and not duplicated
+
+bundle words behave like “user words” (editable/deletable) after import
+
+Part B — Add bundle files and a manifest
+New folder
+
+Create:
+client/data/bundles/
+
+Add bundle files as TypeScript (recommended for type safety) or JSON.
+
+TypeScript bundle format (recommended):
+
+// client/data/bundles/bundle_2026_02_animals.ts
+import type { Word } from "../dictionary";
+
+export type WordBundle = {
+  bundleId: string;
+  title: string;
+  description?: string;
+  words: Word[]; // IMPORTANT: include stable id >= 100000
+};
+
+export const bundle_2026_02_animals: WordBundle = {
+  bundleId: "2026-02-animals",
+  title: "Animals Pack",
+  description: "Common animal vocabulary.",
+  words: [
+    { id: 100001, english: "Dog", mongolian: "Нохой", pronunciation: "Nokhoi", category: "animals" },
+    { id: 100002, english: "Cat", mongolian: "Муур", pronunciation: "Muur", category: "animals" },
+  ],
+};
+
+Bundle manifest
+
+Create:
+client/data/bundles/index.ts
+
+import type { WordBundle } from "./bundle_2026_02_animals";
+import { bundle_2026_02_animals } from "./bundle_2026_02_animals";
+// import more bundles...
+
+export const bundledWordBundles = [
+  bundle_2026_02_animals,
+  // ...
+];
+
+Part C — Add new AsyncStorage keys for bundle state
+
+In client/lib/storage.ts, extend STORAGE_KEYS:
+
+const STORAGE_KEYS = {
+  DAILY_PROGRESS: "daily_progress",
+  THEME_PREFERENCE: "theme_preference",
+  EXTRA_WORDS_SESSION: "extra_words_session",
+  WORD_CONFIDENCE: "word_confidence",
+  USER_DICTIONARY: "user_dictionary",
+  DELETED_WORD_IDS: "deleted_word_ids",
+
+  // NEW:
+  BUNDLE_APPLIED: "word_bundle_applied",
+  BUNDLE_DISMISSED: "word_bundle_dismissed",
+};
+
+Part D — Add bundle state helper functions in storage.ts
+
+Implement these helpers:
+
+type BundleStateMap = Record<string, number>; // bundleId -> timestamp
+
+async function getBundleMap(key: string): Promise<BundleStateMap> {
+  const raw = await AsyncStorage.getItem(key);
+  return raw ? (JSON.parse(raw) as BundleStateMap) : {};
+}
+
+async function setBundleMap(key: string, map: BundleStateMap) {
+  await AsyncStorage.setItem(key, JSON.stringify(map));
+}
+
+export async function getBundleAppliedMap() {
+  return getBundleMap(STORAGE_KEYS.BUNDLE_APPLIED);
+}
+
+export async function getBundleDismissedMap() {
+  return getBundleMap(STORAGE_KEYS.BUNDLE_DISMISSED);
+}
+
+export async function markBundleApplied(bundleId: string) {
+  const map = await getBundleAppliedMap();
+  map[bundleId] = Date.now();
+  await setBundleMap(STORAGE_KEYS.BUNDLE_APPLIED, map);
+}
+
+export async function markBundleDismissed(bundleId: string) {
+  const map = await getBundleDismissedMap();
+  map[bundleId] = Date.now();
+  await setBundleMap(STORAGE_KEYS.BUNDLE_DISMISSED, map);
+}
+
+Part E — Apply a bundle (merge into user_dictionary safely)
+Requirements
+
+Never overwrite existing words by default.
+
+Prevent duplicates if the bundle is applied twice.
+
+Bundle words should become “user words” (editable/deletable) by inserting into UserDictionary.words.
+
+Function signature
+
+Add to client/lib/storage.ts:
+
+import type { Word } from "@/data/dictionary";
+import type { WordBundle } from "@/data/bundles/bundle_2026_02_animals"; // or export WordBundle from a common file
+
+export async function applyWordBundle(bundle: WordBundle): Promise<{ added: number; skipped: number }> {
+  const dict = await getUserDictionary();
+  const existingIds = new Set(dict.words.map(w => w.id));
+
+  let added = 0;
+  let skipped = 0;
+
+  for (const w of bundle.words) {
+    if (existingIds.has(w.id)) {
+      skipped++;
+      continue;
+    }
+    dict.words.push(w);
+    existingIds.add(w.id);
+    added++;
+  }
+
+  await saveUserDictionary(dict);
+  await markBundleApplied(bundle.bundleId);
+
+  return { added, skipped };
+}
+
+Safety check: enforce stable ID ranges
+
+Before pushing words, validate:
+
+w.id >= 100000
+If not, throw or skip with console warning.
+
+Part F — Ensure nextId never collides (small enhancement)
+
+Update getUserDictionary() initialization logic:
+
+Initialize default:
+
+nextId: 1000
+
+When loading existing dict, ensure nextId is at least one more than the max user-created ID in the 1000..99999 range.
+
+Pseudo:
+
+const maxUserCreatedId = Math.max(
+  999,
+  ...dict.words.map(w => w.id).filter(id => id >= 1000 && id < 100000)
+);
+
+dict.nextId = Math.max(dict.nextId ?? 1000, maxUserCreatedId + 1);
+
+
+This protects users who have edited data or older versions.
+
+Part G — UI: “Dictionary Updates” screen
+Where
+
+Add a new screen:
+client/screens/DictionaryUpdatesScreen.tsx
+
+Behavior
+
+Load:
+
+bundledWordBundles from client/data/bundles
+
+appliedMap and dismissedMap
+
+Determine pendingBundles = bundles.filter(b => !appliedMap[b.bundleId] && !dismissedMap[b.bundleId])
+
+Render list of bundles with:
+
+Title, description, word count
+
+Buttons:
+
+“Preview”
+
+“Add to my dictionary” (calls applyWordBundle)
+
+“Dismiss” (calls markBundleDismissed)
+
+Hook it into navigation
+
+Add “Dictionary Updates” entry in Settings screen to navigate to this screen.
+
+Optional: In AppContext.tsx (on mount), if pendingBundles exists, show a small banner “New dictionary packs available”.
+
+Part H — No overwrite guarantee remains intact
+
+Do not alter base dictionary or rewrite USER_DICTIONARY except:
+
+adding bundle words to dict.words
+
+edits stay in editedWords
+
+deletions stay in deleted_word_ids
+
+This ensures app updates never overwrite personal dictionary data, and iOS backup/restore continues to work.
+
+Acceptance tests
+
+User edits base word (id 4) → edit persists after app update.
+
+User adds custom word (id 1000+) → persists after update.
+
+New build includes bundle “Animals Pack” → user sees it pending.
+
+User applies bundle → words added with ids 100000+; show “Added X, skipped Y”
+
+Relaunch / revisit screen → bundle no longer pending.
+
+User can edit/delete a bundle word like any user-added word.

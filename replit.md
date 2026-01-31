@@ -30,6 +30,7 @@ Preferred communication style: Simple, everyday language.
 - The dictionary is embedded client-side with 60+ words across categories (greetings, numbers, family, nature)
 - **Confidence Scoring**: Each word can have a confidence level (learning/familiar/mastered) that persists across sessions
 - **Dictionary Management**: Users can add, edit, and delete words via the EditWord screen. Changes persist in AsyncStorage (userAddedWords, editedWords, deletedWordIds)
+- **Dictionary Bundles**: Optional vocabulary packs that ship with app updates. Users can preview, accept, or dismiss bundles from Settings → Dictionary Updates. Bundle words use IDs >= 100000 to avoid collisions with base dictionary (1-999) and user-added words (1000-99999). Bundle state tracked via AsyncStorage (word_bundle_applied, word_bundle_dismissed)
 
 ### Key Design Patterns
 - **Path Aliases**: `@/` maps to `./client`, `@shared/` maps to `./shared`

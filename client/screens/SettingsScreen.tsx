@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useCallback } from "react";
 import { StyleSheet, View, Switch, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -27,23 +27,25 @@ export default function SettingsScreen() {
   const { themePreference, setThemePreference } = useApp();
   const [pendingBundleCount, setPendingBundleCount] = useState(0);
 
-  useEffect(() => {
-    const checkPendingBundles = async () => {
-      try {
-        const [appliedMap, dismissedMap] = await Promise.all([
-          getBundleAppliedMap(),
-          getBundleDismissedMap(),
-        ]);
-        const pending = bundledWordBundles.filter(
-          (b) => !appliedMap[b.bundleId] && !dismissedMap[b.bundleId]
-        );
-        setPendingBundleCount(pending.length);
-      } catch (error) {
-        console.error("Failed to check pending bundles:", error);
-      }
-    };
-    checkPendingBundles();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      const checkPendingBundles = async () => {
+        try {
+          const [appliedMap, dismissedMap] = await Promise.all([
+            getBundleAppliedMap(),
+            getBundleDismissedMap(),
+          ]);
+          const pending = bundledWordBundles.filter(
+            (b) => !appliedMap[b.bundleId] && !dismissedMap[b.bundleId]
+          );
+          setPendingBundleCount(pending.length);
+        } catch (error) {
+          console.error("Failed to check pending bundles:", error);
+        }
+      };
+      checkPendingBundles();
+    }, [])
+  );
 
   const handleThemeToggle = async (value: boolean) => {
     Haptics.selectionAsync();

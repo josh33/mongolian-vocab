@@ -24,6 +24,7 @@ import { queryClient } from "@/lib/query-client";
 import RootStackNavigator from "@/navigation/RootStackNavigator";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppProvider } from "@/context/AppContext";
+import { checkAndApplyOTAUpdate, registerOTAAppStateListener } from "@/lib/otaUpdates";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -42,6 +43,12 @@ export default function App() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
+
+  useEffect(() => {
+    checkAndApplyOTAUpdate();
+    const unsubscribe = registerOTAAppStateListener();
+    return unsubscribe;
+  }, []);
 
   if (!fontsLoaded && !fontError) {
     return null;

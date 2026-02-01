@@ -8,7 +8,8 @@
       "distribution": "store"
     },
     "production": {
-      "distribution": "store"
+      "distribution": "store",
+      "autoIncrement": true
     }
   },
   "submit": {

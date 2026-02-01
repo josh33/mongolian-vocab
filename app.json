@@ -19,7 +19,6 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.mongolianvocab.app",
-      "buildNumber": "10",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIDeviceFamily": [1]

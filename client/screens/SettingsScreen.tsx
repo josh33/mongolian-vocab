@@ -2,8 +2,7 @@ import React, { useState, useCallback } from "react";
 import { StyleSheet, View, Switch, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useFocusEffect } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Constants from "expo-constants";
@@ -14,40 +13,29 @@ import { ThemeSegmentedControl } from "@/components/ThemeSegmentedControl";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
-import { RootStackParamList } from "@/navigation/RootStackNavigator";
-import { bundledWordBundles } from "@/data/bundles";
-import { getBundleAppliedMap, getBundleDismissedMap, resetTodayProgress, getOTAUpdatesEnabled, setOTAUpdatesEnabled } from "@/lib/storage";
+import { resetTodayProgress, getOTAUpdatesEnabled, setOTAUpdatesEnabled } from "@/lib/storage";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
 
   const { themePreference, setThemePreference, refreshStreakData } = useApp();
-  const [pendingBundleCount, setPendingBundleCount] = useState(0);
   const [otaUpdatesEnabled, setOtaUpdatesEnabledState] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
-      const checkPendingBundles = async () => {
+      const loadSettings = async () => {
         try {
-          const [appliedMap, dismissedMap, otaEnabled] = await Promise.all([
-            getBundleAppliedMap(),
-            getBundleDismissedMap(),
-            getOTAUpdatesEnabled(),
-          ]);
-          const pending = bundledWordBundles.filter(
-            (b) => !appliedMap[b.bundleId] && !dismissedMap[b.bundleId]
-          );
-          setPendingBundleCount(pending.length);
+          const otaEnabled = await getOTAUpdatesEnabled();
           setOtaUpdatesEnabledState(otaEnabled);
         } catch (error) {
-          console.error("Failed to check pending bundles:", error);
+          console.error("Failed to load settings:", error);
         }
       };
-      checkPendingBundles();
+
+      loadSettings();
     }, [])
   );
 
@@ -58,11 +46,6 @@ export default function SettingsScreen() {
     Haptics.selectionAsync();
     const newTheme = index === 0 ? "light" : index === 1 ? "dark" : "system";
     await setThemePreference(newTheme);
-  };
-
-  const handleDictionaryUpdates = () => {
-    Haptics.selectionAsync();
-    navigation.navigate("DictionaryUpdates");
   };
 
   const handleResetToday = async () => {
@@ -116,26 +99,6 @@ export default function SettingsScreen() {
       </ThemedText>
 
       <View style={[styles.settingsCard, { backgroundColor: colors.backgroundDefault }]}>
-        <Pressable
-          style={styles.settingRow}
-          onPress={handleDictionaryUpdates}
-          testID="dictionary-updates-button"
-        >
-          <View style={styles.settingLabelWithBadge}>
-            <ThemedText style={[styles.settingLabel, { color: colors.text }]}>
-              Dictionary Updates
-            </ThemedText>
-            {pendingBundleCount > 0 ? (
-              <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-                <ThemedText style={styles.badgeText}>{pendingBundleCount}</ThemedText>
-              </View>
-            ) : null}
-          </View>
-          <Feather name="chevron-right" size={20} color={colors.textSecondary} />
-        </Pressable>
-
-        <View style={[styles.divider, { backgroundColor: colors.backgroundSecondary }]} />
-
         <View style={styles.settingRow}>
           <View style={styles.settingLabelColumn}>
             <ThemedText style={[styles.settingLabel, { color: colors.text }]}>
@@ -246,11 +209,6 @@ const styles = StyleSheet.create({
   settingLabel: {
     fontSize: 16,
   },
-  settingLabelWithBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
   settingLabelColumn: {
     flex: 1,
     marginRight: Spacing.md,
@@ -258,19 +216,6 @@ const styles = StyleSheet.create({
   settingDescription: {
     fontSize: 13,
     marginTop: 2,
-  },
-  badge: {
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 6,
-  },
-  badgeText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "600",
   },
   settingValue: {
     fontSize: 16,

@@ -175,7 +175,7 @@ export default function StreakScreen() {
           </View>
 
           <ThemedText style={[styles.streakCount, { color: colors.text }]}>
-            {streakData.currentStreak} Day Streak{streakData.currentStreak !== 1 ? "" : ""}!
+            {streakData.currentStreak} Day Streak{streakData.currentStreak !== 1 ? "s" : ""}!
           </ThemedText>
 
           <View style={styles.weekContainer}>
@@ -273,10 +273,12 @@ const styles = StyleSheet.create({
   streakCount: {
     fontSize: 28,
     fontWeight: "700",
+    lineHeight: 36,
     marginTop: Spacing.md,
     marginBottom: Spacing["2xl"],
     textAlign: "center",
     paddingHorizontal: Spacing.md,
+    paddingBottom: 2,
   },
   weekContainer: {
     flexDirection: "row",
@@ -320,7 +322,9 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 28,
     fontWeight: "700",
+    lineHeight: 36,
     paddingHorizontal: Spacing.xs,
+    paddingBottom: 2,
   },
   statLabel: {
     fontSize: 12,

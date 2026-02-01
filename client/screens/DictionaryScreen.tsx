@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import React, { useState, useMemo, useCallback, useRef } from "react";
 import { StyleSheet, View, FlatList, TextInput, Pressable, Image, InputAccessoryView, Platform, Keyboard } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -20,6 +20,7 @@ import {
 } from "@/lib/storage";
 import { getAcceptedPackWords } from "@/lib/packWords";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
+import { getPendingPackCount } from "@/lib/dictionaryUpdates";
 
 const CONFIDENCE_CONFIG = {
   learning: { label: "Learning", color: "#E57373" },
@@ -40,6 +41,7 @@ export default function DictionaryScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [wordConfidence, setWordConfidence] = useState<WordConfidence>({});
   const [allWords, setAllWords] = useState<Word[]>(baseDictionary);
+  const [pendingPackCount, setPendingPackCount] = useState(0);
 
   const loadData = useCallback(async () => {
     const [confidence, userDict, deletedIds, packWords] = await Promise.all([
@@ -66,8 +68,24 @@ export default function DictionaryScreen() {
   useFocusEffect(
     useCallback(() => {
       loadData();
+
+      const loadPending = async () => {
+        try {
+          const count = await getPendingPackCount();
+          setPendingPackCount(count);
+        } catch (e) {
+          console.error("Failed to load pending pack count:", e);
+        }
+      };
+
+      loadPending();
     }, [loadData])
   );
+
+  const handleOpenDictionaryUpdates = () => {
+    Haptics.selectionAsync();
+    navigation.navigate("DictionaryUpdates");
+  };
 
   const filteredWords = useMemo(() => {
     let words = allWords;
@@ -125,14 +143,33 @@ export default function DictionaryScreen() {
           <ThemedText style={[styles.headerTitle, { color: colors.text }]}>
             Dictionary
           </ThemedText>
-          <Pressable
-            onPress={handleAddPress}
-            style={[styles.addButton, { backgroundColor: colors.secondary }]}
-            hitSlop={8}
-            testID="add-word-button"
-          >
-            <Feather name="plus" size={22} color="#FFFFFF" />
-          </Pressable>
+
+          <View style={styles.headerActions}>
+            <Pressable
+              onPress={handleOpenDictionaryUpdates}
+              style={[styles.iconButton, { backgroundColor: colors.backgroundDefault }]}
+              hitSlop={8}
+              testID="dictionary-updates-icon"
+            >
+              <Feather name="download" size={20} color={colors.text} />
+              {pendingPackCount > 0 ? (
+                <View style={[styles.headerBadge, { backgroundColor: colors.primary }]}>
+                  <ThemedText style={styles.headerBadgeText}>
+                    {pendingPackCount}
+                  </ThemedText>
+                </View>
+              ) : null}
+            </Pressable>
+
+            <Pressable
+              onPress={handleAddPress}
+              style={[styles.addButton, { backgroundColor: colors.secondary }]}
+              hitSlop={8}
+              testID="add-word-button"
+            >
+              <Feather name="plus" size={22} color="#FFFFFF" />
+            </Pressable>
+          </View>
         </View>
         <Pressable 
           style={[styles.searchInputContainer, { backgroundColor: colors.backgroundDefault }]}
@@ -281,6 +318,36 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "700",
     lineHeight: 36,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  headerBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 13,
   },
   addButton: {
     width: 36,

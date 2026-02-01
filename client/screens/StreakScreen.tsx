@@ -203,7 +203,7 @@ export default function StreakScreen() {
                   Longest Streak
                 </ThemedText>
               </View>
-              {streakData.streakFreezeAvailable && (
+              {streakData.streakFreezeAvailable ? (
                 <View style={styles.statItem}>
                   <Feather name="shield" size={24} color={colors.primary} />
                   <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>

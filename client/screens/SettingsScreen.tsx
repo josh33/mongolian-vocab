@@ -5,12 +5,12 @@ import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
-import SegmentedControl from "@react-native-segmented-control/segmented-control";
 import * as Haptics from "expo-haptics";
 import Constants from "expo-constants";
 
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { ThemedText } from "@/components/ThemedText";
+import { ThemeSegmentedControl } from "@/components/ThemeSegmentedControl";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
@@ -98,14 +98,14 @@ export default function SettingsScreen() {
           <ThemedText style={[styles.settingLabel, { color: colors.text }]}>
             Theme
           </ThemedText>
-          <SegmentedControl
+          <ThemeSegmentedControl
             values={themeOptions}
             selectedIndex={selectedThemeIndex}
-            onChange={(event) => handleThemeChange(event.nativeEvent.selectedSegmentIndex)}
-            style={styles.segmentedControl}
+            onValueChange={handleThemeChange}
             tintColor={colors.primary}
-            fontStyle={{ color: colors.text }}
-            activeFontStyle={{ color: "#FFFFFF" }}
+            textColor={colors.text}
+            activeTextColor="#FFFFFF"
+            backgroundColor={colors.backgroundSecondary}
             testID="theme-segmented-control"
           />
         </View>

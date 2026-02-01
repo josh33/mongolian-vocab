@@ -555,8 +555,8 @@ export async function getBundleAppliedMap(): Promise<BundleStateMap> {
     }
     const packStatus = await getPackStatusFromDB();
     const result: BundleStateMap = {};
-    for (const [packId, status] of Object.entries(packStatus)) {
-      if (status === "accepted") {
+    for (const [packId, data] of Object.entries(packStatus)) {
+      if (data.status === "accepted") {
         result[packId] = Date.now();
       }
     }
@@ -573,8 +573,8 @@ export async function getBundleDismissedMap(): Promise<BundleStateMap> {
     }
     const packStatus = await getPackStatusFromDB();
     const result: BundleStateMap = {};
-    for (const [packId, status] of Object.entries(packStatus)) {
-      if (status === "dismissed") {
+    for (const [packId, data] of Object.entries(packStatus)) {
+      if (data.status === "dismissed") {
         result[packId] = Date.now();
       }
     }

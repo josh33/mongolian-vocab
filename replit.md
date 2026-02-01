@@ -19,10 +19,8 @@ Preferred communication style: Simple, everyday language.
 - **Fonts**: Google Fonts (Lora for headings, Inter for body text) loaded via Expo Font
 
 ### Backend Architecture
-- **Runtime**: Node.js with Express 5
-- **API Structure**: RESTful endpoints prefixed with `/api`
-- **Database**: PostgreSQL with Drizzle ORM for type-safe queries
-- **Schema Validation**: Zod with drizzle-zod integration for runtime validation
+- **Runtime**: Node.js with Express 5 (serves static Expo bundles only - no API calls from app)
+- **Note**: The app is fully offline-capable. All vocabulary data is embedded client-side and progress is stored locally. The backend only serves the static app bundle.
 
 ### Data Flow
 - Daily vocabulary words are selected deterministically based on the current date using a seeded shuffle algorithm
@@ -70,6 +68,7 @@ Preferred communication style: Simple, everyday language.
 ### Core Services
 - **PostgreSQL Database**: Used for user data persistence (configured via `DATABASE_URL` environment variable)
 - **Drizzle ORM**: Database migrations stored in `./migrations` directory
+- **Note**: The app operates fully offline. The database is available but not actively used by the vocabulary app.
 
 ### Third-Party Libraries
 - **expo-haptics**: Tactile feedback for card interactions

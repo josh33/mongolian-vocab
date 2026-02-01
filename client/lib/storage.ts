@@ -36,6 +36,7 @@ const STORAGE_KEYS = {
   STREAK_DATA: "streak_data",
   ACCEPTED_PACKS: "accepted_packs",
   DISMISSED_PACKS: "dismissed_packs",
+  OTA_UPDATES_ENABLED: "ota_updates_enabled",
 };
 
 export type ConfidenceLevel = "learning" | "familiar" | "mastered";
@@ -1080,4 +1081,21 @@ export async function isPackDismissed(packId: string, version: number): Promise<
   }
   const packStatus = await getPackStatusFromDB();
   return packStatus[packId] === "dismissed";
+}
+
+export async function getOTAUpdatesEnabled(): Promise<boolean> {
+  try {
+    const value = await AsyncStorage.getItem(STORAGE_KEYS.OTA_UPDATES_ENABLED);
+    return value === "true";
+  } catch {
+    return false;
+  }
+}
+
+export async function setOTAUpdatesEnabled(enabled: boolean): Promise<void> {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEYS.OTA_UPDATES_ENABLED, enabled ? "true" : "false");
+  } catch (error) {
+    console.error("Failed to save OTA updates preference:", error);
+  }
 }

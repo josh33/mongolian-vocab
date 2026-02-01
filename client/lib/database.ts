@@ -60,6 +60,7 @@ async function initializeTables(database: SQLite.SQLiteDatabase): Promise<void> 
     CREATE TABLE IF NOT EXISTS pack_status (
       pack_id TEXT PRIMARY KEY,
       status TEXT NOT NULL,
+      version INTEGER NOT NULL DEFAULT 1,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -92,6 +93,25 @@ async function initializeTables(database: SQLite.SQLiteDatabase): Promise<void> 
     INSERT OR IGNORE INTO streak_data (id, current_streak, longest_streak, streak_freeze_available) 
     VALUES (1, 0, 0, 1);
   `);
+
+  await runMigrations(database);
+}
+
+async function runMigrations(database: SQLite.SQLiteDatabase): Promise<void> {
+  try {
+    const tableInfo = await database.getAllAsync<{ name: string }>(
+      "PRAGMA table_info(pack_status)"
+    );
+    const hasVersionColumn = tableInfo.some(col => col.name === "version");
+    
+    if (!hasVersionColumn) {
+      await database.execAsync(`
+        ALTER TABLE pack_status ADD COLUMN version INTEGER NOT NULL DEFAULT 1;
+      `);
+    }
+  } catch (error) {
+    console.error("Migration error:", error);
+  }
 }
 
 export interface StreakDataRow {
@@ -270,24 +290,24 @@ export async function addDeletedWordDB(wordId: number): Promise<void> {
   );
 }
 
-export async function getPackStatusFromDB(): Promise<Record<string, "accepted" | "dismissed">> {
+export async function getPackStatusFromDB(): Promise<Record<string, { status: "accepted" | "dismissed"; version: number }>> {
   const database = await getDatabase();
-  const rows = await database.getAllAsync<{ pack_id: string; status: string }>(
-    "SELECT pack_id, status FROM pack_status"
+  const rows = await database.getAllAsync<{ pack_id: string; status: string; version: number }>(
+    "SELECT pack_id, status, version FROM pack_status"
   );
   
-  const result: Record<string, "accepted" | "dismissed"> = {};
+  const result: Record<string, { status: "accepted" | "dismissed"; version: number }> = {};
   for (const row of rows) {
-    result[row.pack_id] = row.status as "accepted" | "dismissed";
+    result[row.pack_id] = { status: row.status as "accepted" | "dismissed", version: row.version };
   }
   return result;
 }
 
-export async function setPackStatusDB(packId: string, status: "accepted" | "dismissed"): Promise<void> {
+export async function setPackStatusDB(packId: string, status: "accepted" | "dismissed", version: number = 1): Promise<void> {
   const database = await getDatabase();
   await database.runAsync(
-    "INSERT OR REPLACE INTO pack_status (pack_id, status, updated_at) VALUES (?, ?, datetime('now'))",
-    [packId, status]
+    "INSERT OR REPLACE INTO pack_status (pack_id, status, version, updated_at) VALUES (?, ?, ?, datetime('now'))",
+    [packId, status, version]
   );
 }
 

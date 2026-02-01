@@ -5,6 +5,7 @@ import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
+import SegmentedControl from "@react-native-segmented-control/segmented-control";
 import * as Haptics from "expo-haptics";
 import Constants from "expo-constants";
 
@@ -50,9 +51,13 @@ export default function SettingsScreen() {
     }, [])
   );
 
-  const handleThemeToggle = async (value: boolean) => {
+  const themeOptions = ["Light", "Dark", "System"];
+  const selectedThemeIndex = themePreference === "light" ? 0 : themePreference === "dark" ? 1 : 2;
+
+  const handleThemeChange = async (index: number) => {
     Haptics.selectionAsync();
-    await setThemePreference(value ? "dark" : "light");
+    const newTheme = index === 0 ? "light" : index === 1 ? "dark" : "system";
+    await setThemePreference(newTheme);
   };
 
   const handleDictionaryUpdates = () => {
@@ -89,15 +94,19 @@ export default function SettingsScreen() {
       </ThemedText>
 
       <View style={[styles.settingsCard, { backgroundColor: colors.backgroundDefault }]}>
-        <View style={styles.settingRow}>
+        <View style={styles.themeSettingRow}>
           <ThemedText style={[styles.settingLabel, { color: colors.text }]}>
-            Dark Mode
+            Theme
           </ThemedText>
-          <Switch
-            value={themePreference === "dark" || (themePreference === "system" && isDark)}
-            onValueChange={handleThemeToggle}
-            trackColor={{ false: colors.backgroundSecondary, true: colors.secondary }}
-            thumbColor="#FFFFFF"
+          <SegmentedControl
+            values={themeOptions}
+            selectedIndex={selectedThemeIndex}
+            onChange={(event) => handleThemeChange(event.nativeEvent.selectedSegmentIndex)}
+            style={styles.segmentedControl}
+            tintColor={colors.primary}
+            fontStyle={{ color: colors.text }}
+            activeFontStyle={{ color: "#FFFFFF" }}
+            testID="theme-segmented-control"
           />
         </View>
       </View>
@@ -139,7 +148,7 @@ export default function SettingsScreen() {
           <Switch
             value={otaUpdatesEnabled}
             onValueChange={handleOTAToggle}
-            trackColor={{ false: colors.backgroundSecondary, true: colors.secondary }}
+            trackColor={{ false: colors.primary + "40", true: colors.primary }}
             thumbColor="#FFFFFF"
             testID="ota-updates-toggle"
           />
@@ -224,6 +233,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     minHeight: 52,
+  },
+  themeSettingRow: {
+    flexDirection: "column",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    gap: Spacing.sm,
+  },
+  segmentedControl: {
+    width: "100%",
   },
   settingLabel: {
     fontSize: 16,

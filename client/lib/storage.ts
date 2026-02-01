@@ -978,9 +978,9 @@ export async function getAcceptedPacks(): Promise<AcceptedPack[]> {
     }
     const packStatus = await getPackStatusFromDB();
     const result: AcceptedPack[] = [];
-    for (const [packId, status] of Object.entries(packStatus)) {
-      if (status === "accepted") {
-        result.push({ id: packId, version: 1 });
+    for (const [packId, data] of Object.entries(packStatus)) {
+      if (data.status === "accepted") {
+        result.push({ id: packId, version: data.version });
       }
     }
     return result;
@@ -1015,7 +1015,7 @@ export async function acceptPack(packId: string, version: number): Promise<void>
     await saveAcceptedPacks(packs);
     return;
   }
-  await setPackStatusDB(packId, "accepted");
+  await setPackStatusDB(packId, "accepted", version);
 }
 
 export async function isPackAccepted(packId: string): Promise<AcceptedPack | null> {
@@ -1033,9 +1033,9 @@ export async function getDismissedPacks(): Promise<DismissedPack[]> {
     }
     const packStatus = await getPackStatusFromDB();
     const result: DismissedPack[] = [];
-    for (const [packId, status] of Object.entries(packStatus)) {
-      if (status === "dismissed") {
-        result.push({ id: packId, version: 1, timestamp: Date.now() });
+    for (const [packId, data] of Object.entries(packStatus)) {
+      if (data.status === "dismissed") {
+        result.push({ id: packId, version: data.version, timestamp: Date.now() });
       }
     }
     return result;
@@ -1070,7 +1070,7 @@ export async function dismissPack(packId: string, version: number): Promise<void
     await saveDismissedPacks(packs);
     return;
   }
-  await setPackStatusDB(packId, "dismissed");
+  await setPackStatusDB(packId, "dismissed", version);
 }
 
 export async function isPackDismissed(packId: string, version: number): Promise<boolean> {
@@ -1080,7 +1080,8 @@ export async function isPackDismissed(packId: string, version: number): Promise<
     return dismissed ? dismissed.version === version : false;
   }
   const packStatus = await getPackStatusFromDB();
-  return packStatus[packId] === "dismissed";
+  const data = packStatus[packId];
+  return data?.status === "dismissed" && data?.version === version;
 }
 
 export async function getOTAUpdatesEnabled(): Promise<boolean> {

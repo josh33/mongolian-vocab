@@ -1,9 +1,8 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { StyleSheet, View, Pressable, ScrollView, Image } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import Svg, { Defs, LinearGradient, Stop, Rect, Circle, Path } from "react-native-svg";
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -22,29 +21,6 @@ import { RootStackParamList } from "@/navigation/RootStackNavigator";
 import horseArcherImage from "../../assets/images/horse-archer.png";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
-
-function SunOverSteppe({ width, color }: { width: number; color: string }) {
-  return (
-    <Svg width={width} height={width / 3} viewBox="0 0 120 40" fill="none">
-      <Defs>
-        <LinearGradient id="sunGrad" x1="0.5" y1="0" x2="0.5" y2="1">
-          <Stop offset="0%" stopColor={color} stopOpacity="1" />
-          <Stop offset="100%" stopColor={color} stopOpacity="0.6" />
-        </LinearGradient>
-        <LinearGradient id="skyGrad" x1="0.5" y1="0" x2="0.5" y2="1">
-          <Stop offset="0%" stopColor={color} stopOpacity="0.1" />
-          <Stop offset="100%" stopColor={color} stopOpacity="0.02" />
-        </LinearGradient>
-      </Defs>
-      <Rect x="0" y="0" width="120" height="40" fill="url(#skyGrad)" rx="8" />
-      <Circle cx="60" cy="30" r="15" fill="url(#sunGrad)" />
-      <Path d="M60 10 L60 5" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <Path d="M75 15 L78 12" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <Path d="M45 15 L42 12" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <Path d="M0 35 Q30 32 60 35 Q90 38 120 35" stroke={color} strokeWidth="1.5" opacity="0.4" />
-    </Svg>
-  );
-}
 
 function DayIndicator({ 
   dayLabel, 
@@ -120,10 +96,16 @@ export default function StreakScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
-  const { streakData } = useApp();
+  const { streakData, refreshStreakData } = useApp();
 
   const scale = useSharedValue(0.8);
   const opacity = useSharedValue(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshStreakData();
+    }, [refreshStreakData])
+  );
 
   React.useEffect(() => {
     scale.value = withSpring(1, { damping: 15, stiffness: 100 });
@@ -211,12 +193,8 @@ export default function StreakScreen() {
             {getMessage()}
           </ThemedText>
 
-          <View style={[styles.decorativeContainer, { marginTop: Spacing["2xl"] }]}>
-            <SunOverSteppe width={200} color={colors.secondary} />
-          </View>
-
-          {streakData.longestStreak > 0 && (
-            <View style={[styles.statsContainer, { backgroundColor: colors.backgroundSecondary }]}>
+          {streakData.longestStreak > 0 ? (
+            <View style={[styles.statsContainer, { backgroundColor: colors.backgroundSecondary, marginTop: Spacing["2xl"] }]}>
               <View style={styles.statItem}>
                 <ThemedText style={[styles.statValue, { color: colors.secondary }]}>
                   {streakData.longestStreak}
@@ -232,9 +210,9 @@ export default function StreakScreen() {
                     Freeze Available
                   </ThemedText>
                 </View>
-              )}
+              ) : null}
             </View>
-          )}
+          ) : null}
 
           <View style={[styles.infoCard, { backgroundColor: colors.backgroundSecondary }]}>
             <Feather name="info" size={18} color={colors.primary} />
@@ -322,9 +300,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: "center",
     lineHeight: 24,
-  },
-  decorativeContainer: {
-    alignItems: "center",
   },
   statsContainer: {
     flexDirection: "row",

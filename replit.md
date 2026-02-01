@@ -26,7 +26,11 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Flow
 - Daily vocabulary words are selected deterministically based on the current date using a seeded shuffle algorithm
-- Progress is persisted locally using AsyncStorage (daily progress, theme preference, extra word sessions, word confidence levels)
+- **Local Storage Architecture (Platform-Aware)**:
+  - **Native (iOS/Android)**: Uses SQLite via expo-sqlite for reliable persistence across app updates and reinstalls
+  - **Web**: Uses AsyncStorage (SQLite has limited WebAssembly support on web)
+  - Key files: `client/lib/database.ts` (SQLite schema/operations), `client/lib/storage.ts` (platform-aware API)
+  - Automatic migration: On native platforms, existing AsyncStorage data is migrated to SQLite on first launch
 - The dictionary is embedded client-side with 60+ words across categories (greetings, numbers, family, nature)
 - **Confidence Scoring**: Each word can have a confidence level (learning/familiar/mastered) that persists across sessions
 - **Dictionary Management**: Users can add, edit, and delete words via the EditWord screen. Changes persist in AsyncStorage (userAddedWords, editedWords, deletedWordIds)
@@ -48,7 +52,7 @@ Preferred communication style: Simple, everyday language.
   - StreakScreen modal with current streak, weekly calendar, and streak freeze status
   - Weekly streak freeze: allows recovery by practicing 10 words the next day (resets each Sunday)
   - Streak celebration on CompletionScreen when streak is incremented
-  - History stored in AsyncStorage with date-based tracking
+  - History stored in SQLite (native) or AsyncStorage (web) with date-based tracking
 
 ### Key Design Patterns
 - **Path Aliases**: `@/` maps to `./client`, `@shared/` maps to `./shared`
@@ -72,7 +76,8 @@ Preferred communication style: Simple, everyday language.
 - **expo-blur**: iOS-style blur effects for navigation bars
 - **expo-splash-screen**: Controlled splash screen display during font loading
 - **expo-updates**: Over-the-air updates for EAS-built binaries
-- **@react-native-async-storage/async-storage**: Local data persistence for progress and preferences
+- **expo-sqlite**: SQLite database for reliable local persistence on native platforms (iOS/Android)
+- **@react-native-async-storage/async-storage**: Local data persistence for web platform and legacy fallback
 
 ### Development Environment
 - Replit-specific environment variables: `REPLIT_DEV_DOMAIN`, `REPLIT_DOMAINS`, `EXPO_PUBLIC_DOMAIN`

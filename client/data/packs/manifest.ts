@@ -16,4 +16,11 @@ export const PACKS: DictionaryPackMeta[] = [
     description: "Common animal vocabulary with 15 essential words.",
     wordCount: 15,
   },
+  {
+    id: "missionary_starter",
+    version: 1,
+    title: "Missionary Starter",
+    description: "Essential vocabulary for missionaries learning Mongolian.",
+    wordCount: 20,
+  },
 ];

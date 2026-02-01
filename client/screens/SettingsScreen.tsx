@@ -15,7 +15,7 @@ import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { bundledWordBundles } from "@/data/bundles";
-import { getBundleAppliedMap, getBundleDismissedMap, resetTodayProgress } from "@/lib/storage";
+import { getBundleAppliedMap, getBundleDismissedMap, resetTodayProgress, getOTAUpdatesEnabled, setOTAUpdatesEnabled } from "@/lib/storage";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -26,19 +26,22 @@ export default function SettingsScreen() {
 
   const { themePreference, setThemePreference, refreshStreakData } = useApp();
   const [pendingBundleCount, setPendingBundleCount] = useState(0);
+  const [otaUpdatesEnabled, setOtaUpdatesEnabledState] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       const checkPendingBundles = async () => {
         try {
-          const [appliedMap, dismissedMap] = await Promise.all([
+          const [appliedMap, dismissedMap, otaEnabled] = await Promise.all([
             getBundleAppliedMap(),
             getBundleDismissedMap(),
+            getOTAUpdatesEnabled(),
           ]);
           const pending = bundledWordBundles.filter(
             (b) => !appliedMap[b.bundleId] && !dismissedMap[b.bundleId]
           );
           setPendingBundleCount(pending.length);
+          setOtaUpdatesEnabledState(otaEnabled);
         } catch (error) {
           console.error("Failed to check pending bundles:", error);
         }
@@ -61,6 +64,12 @@ export default function SettingsScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await resetTodayProgress();
     await refreshStreakData();
+  };
+
+  const handleOTAToggle = async (value: boolean) => {
+    Haptics.selectionAsync();
+    setOtaUpdatesEnabledState(value);
+    await setOTAUpdatesEnabled(value);
   };
 
   const appVersion = Constants.expoConfig?.version ?? "1.0.0";
@@ -115,6 +124,26 @@ export default function SettingsScreen() {
           </View>
           <Feather name="chevron-right" size={20} color={colors.textSecondary} />
         </Pressable>
+
+        <View style={[styles.divider, { backgroundColor: colors.backgroundSecondary }]} />
+
+        <View style={styles.settingRow}>
+          <View style={styles.settingLabelColumn}>
+            <ThemedText style={[styles.settingLabel, { color: colors.text }]}>
+              Auto-download New Packs
+            </ThemedText>
+            <ThemedText style={[styles.settingDescription, { color: colors.textSecondary }]}>
+              Check for new word packs when online
+            </ThemedText>
+          </View>
+          <Switch
+            value={otaUpdatesEnabled}
+            onValueChange={handleOTAToggle}
+            trackColor={{ false: colors.backgroundSecondary, true: colors.secondary }}
+            thumbColor="#FFFFFF"
+            testID="ota-updates-toggle"
+          />
+        </View>
       </View>
 
       <ThemedText style={[styles.sectionTitle, { color: colors.textSecondary, marginTop: Spacing["2xl"] }]}>
@@ -203,6 +232,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
+  },
+  settingLabelColumn: {
+    flex: 1,
+    marginRight: Spacing.md,
+  },
+  settingDescription: {
+    fontSize: 13,
+    marginTop: 2,
   },
   badge: {
     borderRadius: 10,

@@ -1,5 +1,6 @@
 import * as Updates from "expo-updates";
 import { AppState, AppStateStatus } from "react-native";
+import { getOTAUpdatesEnabled } from "./storage";
 
 let hasCheckedThisSession = false;
 
@@ -9,6 +10,11 @@ export async function checkAndApplyOTAUpdate(): Promise<void> {
     hasCheckedThisSession = true;
 
     if (!Updates.isEnabled) {
+      return;
+    }
+
+    const isEnabled = await getOTAUpdatesEnabled();
+    if (!isEnabled) {
       return;
     }
 

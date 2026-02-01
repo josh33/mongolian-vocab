@@ -1,0 +1,322 @@
+Below is a copy/paste set of Replit instructions that will:
+	•	Move “Dictionary Updates” entry point from Settings → Dictionary (top-right icon)
+	•	Keep Auto-download New Packs in Settings
+	•	Fix the wrong “1” badge by unifying the badge logic to the same logic used by DictionaryUpdatesScreen
+	•	Fix badge padding/alignment (the current “1” pill issue)
+
+⸻
+
+✅ Replit Instructions (Copy/Paste)
+
+0) Why the badge is wrong today (so we fix the right thing)
+
+Your Settings badge uses bundles (bundledWordBundles + getBundleAppliedMap/getBundleDismissedMap).
+
+But DictionaryUpdatesScreen uses packs (PACKS + getAcceptedPacks/getDismissedPacks).
+
+Those systems are not guaranteed to match, so the Settings badge can show “1” even when packs are fully imported. We’re going to base the badge on PACKS + accepted/dismissed packs, which is what users actually manage in DictionaryUpdatesScreen.
+
+⸻
+
+1) Add a single “pending pack count” helper
+
+Create a new file:
+
+src/lib/dictionaryUpdates.ts (path may be client/lib/ depending on your repo; match how you import from @/lib/... elsewhere)
+
+import { PACKS } from "@/data/packs";
+import { getAcceptedPacks, getDismissedPacks } from "@/lib/storage";
+
+export async function getPendingPackCount(): Promise<number> {
+  const [accepted, dismissed] = await Promise.all([
+    getAcceptedPacks(),
+    getDismissedPacks(),
+  ]);
+
+  let pending = 0;
+
+  for (const pack of PACKS) {
+    const acceptedPack = accepted.find((a) => a.id === pack.id);
+    if (acceptedPack) {
+      // If accepted but behind, that's an update available (counts as pending badge)
+      if (acceptedPack.version < pack.version) pending += 1;
+      continue;
+    }
+
+    const dismissedPack = dismissed.find((d) => d.id === pack.id);
+
+    // Dismissed only blocks the same version
+    if (dismissedPack && dismissedPack.version === pack.version) {
+      continue;
+    }
+
+    // Not accepted, not dismissed for this version => pending
+    pending += 1;
+  }
+
+  return pending;
+}
+
+✅ This mirrors your DictionaryUpdatesScreen status logic:
+	•	accepted.version < pack.version ⇒ upgrade_available (should count in badge)
+	•	dismissed.version === pack.version ⇒ dismissed (should NOT count)
+	•	otherwise ⇒ pending (counts)
+
+⸻
+
+2) Update DictionaryScreen header to include an Updates icon + badge
+
+Edit DictionaryScreen.tsx.
+
+2.1 Add import
+
+At the top with other imports:
+
+import { getPendingPackCount } from "@/lib/dictionaryUpdates";
+
+2.2 Add state
+
+Inside DictionaryScreen():
+
+const [pendingPackCount, setPendingPackCount] = useState(0);
+
+2.3 Refresh badge count on focus
+
+You already have a useFocusEffect that calls loadData().
+
+Replace your existing useFocusEffect with this version (or modify yours to match):
+
+useFocusEffect(
+  useCallback(() => {
+    loadData();
+
+    const loadPending = async () => {
+      try {
+        const count = await getPendingPackCount();
+        setPendingPackCount(count);
+      } catch (e) {
+        console.error("Failed to load pending pack count:", e);
+      }
+    };
+
+    loadPending();
+  }, [loadData])
+);
+
+2.4 Add navigation handler
+
+Add this near your other handlers:
+
+const handleOpenDictionaryUpdates = () => {
+  Haptics.selectionAsync();
+  navigation.navigate("DictionaryUpdates");
+};
+
+2.5 Add the icon button in the header
+
+Find this block:
+
+<View style={styles.headerRow}>
+  <ThemedText ...>Dictionary</ThemedText>
+  <Pressable onPress={handleAddPress} ...>
+    <Feather name="plus" ... />
+  </Pressable>
+</View>
+
+Replace it with:
+
+<View style={styles.headerRow}>
+  <ThemedText style={[styles.headerTitle, { color: colors.text }]}>
+    Dictionary
+  </ThemedText>
+
+  <View style={styles.headerActions}>
+    <Pressable
+      onPress={handleOpenDictionaryUpdates}
+      style={[styles.iconButton, { backgroundColor: colors.backgroundDefault }]}
+      hitSlop={8}
+      testID="dictionary-updates-icon"
+    >
+      <Feather name="download" size={20} color={colors.text} />
+      {pendingPackCount > 0 ? (
+        <View style={[styles.headerBadge, { backgroundColor: colors.primary }]}>
+          <ThemedText style={styles.headerBadgeText}>
+            {pendingPackCount}
+          </ThemedText>
+        </View>
+      ) : null}
+    </Pressable>
+
+    <Pressable
+      onPress={handleAddPress}
+      style={[styles.addButton, { backgroundColor: colors.secondary }]}
+      hitSlop={8}
+      testID="add-word-button"
+    >
+      <Feather name="plus" size={22} color="#FFFFFF" />
+    </Pressable>
+  </View>
+</View>
+
+2.6 Add styles (badge padding fix)
+
+In StyleSheet.create(...) add:
+
+headerActions: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: Spacing.sm,
+},
+iconButton: {
+  width: 36,
+  height: 36,
+  borderRadius: 18,
+  alignItems: "center",
+  justifyContent: "center",
+  position: "relative",
+},
+headerBadge: {
+  position: "absolute",
+  top: -4,
+  right: -4,
+  minWidth: 18,
+  height: 18,
+  borderRadius: 9,
+  paddingHorizontal: 5,
+  alignItems: "center",
+  justifyContent: "center",
+},
+headerBadgeText: {
+  color: "#FFFFFF",
+  fontSize: 11,
+  fontWeight: "700",
+  lineHeight: 13, // helps vertical centering on iOS
+},
+
+✅ This fixes the “badge padding issues” because:
+	•	it’s absolutely positioned
+	•	consistent min sizes
+	•	lineHeight stabilizes vertical centering
+
+⸻
+
+3) Remove “Dictionary Updates” row from SettingsScreen
+
+Edit SettingsScreen.tsx.
+
+3.1 Remove imports you no longer need
+
+Delete these imports from SettingsScreen:
+	•	useNavigation / NativeStackNavigationProp if they’re only used for DictionaryUpdates now
+	•	bundledWordBundles
+	•	getBundleAppliedMap, getBundleDismissedMap
+	•	Feather can stay if still used (it is used elsewhere)
+
+Specifically you should remove:
+
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { RootStackParamList } from "@/navigation/RootStackNavigator";
+import { bundledWordBundles } from "@/data/bundles";
+import { getBundleAppliedMap, getBundleDismissedMap, ... } from "@/lib/storage";
+
+…and keep useFocusEffect only if you still need it for OTA toggle. (You do.)
+
+3.2 Remove state that tracked “pendingBundleCount”
+
+Delete:
+
+const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+const [pendingBundleCount, setPendingBundleCount] = useState(0);
+
+3.3 Simplify the useFocusEffect
+
+Right now it does:
+	•	get bundle applied/dismissed maps
+	•	compute pending bundles
+	•	set OTA enabled
+
+Replace the whole checkPendingBundles body with only OTA:
+
+useFocusEffect(
+  useCallback(() => {
+    const loadSettings = async () => {
+      try {
+        const otaEnabled = await getOTAUpdatesEnabled();
+        setOtaUpdatesEnabledState(otaEnabled);
+      } catch (error) {
+        console.error("Failed to load settings:", error);
+      }
+    };
+
+    loadSettings();
+  }, [])
+);
+
+3.4 Remove Dictionary Updates UI row
+
+Delete this entire block from SettingsScreen render:
+
+<Pressable ... onPress={handleDictionaryUpdates}>
+  ...
+</Pressable>
+
+<View style={[styles.divider ...]} />
+
+Also delete:
+
+const handleDictionaryUpdates = () => {
+  Haptics.selectionAsync();
+  navigation.navigate("DictionaryUpdates");
+};
+
+✅ After this, Settings will still show:
+	•	Theme
+	•	Auto-download New Packs
+	•	Debug
+	•	About
+
+⸻
+
+4) Verify navigation works (it should)
+
+Your RootStackParamList includes:
+
+DictionaryUpdates: undefined;
+
+And DictionaryScreen uses:
+
+navigation.navigate("DictionaryUpdates");
+
+✅ That’s correct because the Dictionary screen is inside MainTabNavigator which is inside the Root Stack.
+
+⸻
+
+5) Why this also fixes the “wrong 1” bug
+
+The badge count now uses the same storage + data model as DictionaryUpdatesScreen:
+	•	PACKS (manifest-driven list)
+	•	getAcceptedPacks() / getDismissedPacks()
+	•	version comparisons
+
+So if everything is accepted at current versions, the count will be 0.
+
+⸻
+
+6) Optional cleanup (recommended): stop using “bundle” badge logic entirely
+
+You still have bundle functions (getBundleAppliedMap, etc.) and applyWordBundle() in storage.ts. That’s fine if you still use bundles somewhere else.
+
+But do not use bundles for UI notifications anymore—use the pack helper.
+
+⸻
+
+Quick test checklist
+	1.	Open app → Dictionary tab → icon appears next to +
+	2.	Tap icon → navigates to Dictionary Updates
+	3.	Accept a pack → go back → badge decrements
+	4.	If you bump a pack version in PACKS manifest → badge increases (upgrade available)
+
+⸻
+
+If you want, paste your PACKS manifest file (client/data/packs/manifest.ts) and I’ll sanity-check IDs/versions so we’re 100% sure the badge logic can’t drift.

@@ -39,12 +39,12 @@ Preferred communication style: Simple, everyday language.
   - Version tracking enables pack upgrades when new versions ship via OTA
   - Accepted packs stored in AsyncStorage (`accepted_packs` key with array of {id, version})
   - Dismissed packs stored separately with version to re-show when upgraded
-- **OTA Updates**: Automatic over-the-air updates via expo-updates. Configured in app.json with:
-  - `checkAutomatically: "ON_LOAD"` - checks on app launch
-  - `fallbackToCacheTimeout: 0` - loads immediately, applies update on next launch
-  - `runtimeVersion.policy: "appVersion"` - OTA only for same native version
+- **OTA Updates**: Over-the-air updates via expo-updates for new word packs. Features:
+  - **Opt-in by default**: Users must enable "Auto-download New Packs" in Settings to receive updates
+  - `checkAutomatically: "ON_LOAD"` - checks on app launch (if enabled)
   - App also checks for updates when returning to foreground (via AppState listener)
   - Logic in `client/lib/otaUpdates.ts`
+  - Preference stored locally via `ota_updates_enabled` key
 - **Streak System**: Chess.com-inspired daily streak tracking with Mongolian horse icon. Users must practice 5 words/day minimum to maintain streaks. Features:
   - Streak badge in Today screen header (tappable to view details)
   - StreakScreen modal with current streak, weekly calendar, and streak freeze status

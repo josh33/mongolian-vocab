@@ -276,6 +276,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     marginBottom: Spacing["2xl"],
     textAlign: "center",
+    paddingHorizontal: Spacing.md,
   },
   weekContainer: {
     flexDirection: "row",
@@ -314,10 +315,12 @@ const styles = StyleSheet.create({
   statItem: {
     alignItems: "center",
     gap: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
   },
   statValue: {
     fontSize: 28,
     fontWeight: "700",
+    paddingHorizontal: Spacing.xs,
   },
   statLabel: {
     fontSize: 12,

@@ -16,6 +16,7 @@ import {
   getUserDictionary,
   getStreakData,
   checkAndUpdateStreak,
+  initializeStorage,
 } from "@/lib/storage";
 
 export type PracticeMode = "englishToMongolian" | "mongolianToEnglish";
@@ -78,6 +79,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
+      await initializeStorage();
+      
       const [progress, extra, theme, streak] = await Promise.all([
         getDailyProgress(),
         getExtraWordsSession(),

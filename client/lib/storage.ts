@@ -1,5 +1,27 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Word } from "@/data/dictionary";
+import {
+  getDatabase,
+  getStreakDataFromDB,
+  saveStreakDataToDB,
+  getWordConfidenceFromDB,
+  saveWordConfidenceToDB,
+  getUserDictionaryFromDB,
+  addWordToDictionaryDB,
+  removeWordFromDictionaryDB,
+  getDeletedWordIdsFromDB,
+  addDeletedWordDB,
+  getPackStatusFromDB,
+  setPackStatusDB,
+  getDailyProgressFromDB,
+  saveDailyProgressToDB,
+  clearDailyProgressDB,
+  getExtraWordsSessionFromDB,
+  saveExtraWordsSessionToDB,
+  clearExtraWordsSessionDB,
+  hasMigratedFromAsyncStorage,
+  markMigrationComplete,
+} from "./database";
 
 const STORAGE_KEYS = {
   DAILY_PROGRESS: "daily_progress",
@@ -44,17 +66,110 @@ function getTodayString(): string {
   return `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
 }
 
-export async function getDailyProgress(): Promise<DailyProgress> {
+function getDateString(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+export async function initializeStorage(): Promise<void> {
   try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEYS.DAILY_PROGRESS);
-    if (stored) {
-      const progress = JSON.parse(stored) as DailyProgress;
-      if (progress.date === getTodayString()) {
-        return progress;
+    await getDatabase();
+    const migrated = await hasMigratedFromAsyncStorage();
+    if (!migrated) {
+      await migrateFromAsyncStorage();
+      await markMigrationComplete();
+    }
+  } catch (error) {
+    console.error("Failed to initialize storage:", error);
+  }
+}
+
+async function migrateFromAsyncStorage(): Promise<void> {
+  try {
+    const streakRaw = await AsyncStorage.getItem(STORAGE_KEYS.STREAK_DATA);
+    if (streakRaw) {
+      const streakData = JSON.parse(streakRaw);
+      await saveStreakDataToDB({
+        currentStreak: streakData.currentStreak ?? 0,
+        longestStreak: streakData.longestStreak ?? 0,
+        lastCompletedDate: streakData.lastCompletedDate ?? null,
+        streakFreezeAvailable: streakData.streakFreezeAvailable ?? true,
+        streakFreezeUsedDate: streakData.streakFreezeUsedDate ?? null,
+        history: (streakData.history ?? []).map((h: { date: string; status: string; wordsCompleted: number }) => ({
+          date: h.date,
+          status: h.status,
+          wordsCompleted: h.wordsCompleted,
+        })),
+      });
+    }
+
+    const confidenceRaw = await AsyncStorage.getItem(STORAGE_KEYS.WORD_CONFIDENCE);
+    if (confidenceRaw) {
+      const confidence = JSON.parse(confidenceRaw) as Record<string, string>;
+      for (const [wordId, level] of Object.entries(confidence)) {
+        await saveWordConfidenceToDB(parseInt(wordId, 10), level);
       }
     }
+
+    const deletedRaw = await AsyncStorage.getItem(STORAGE_KEYS.DELETED_WORD_IDS);
+    if (deletedRaw) {
+      const deletedIds = JSON.parse(deletedRaw) as number[];
+      for (const id of deletedIds) {
+        await addDeletedWordDB(id);
+      }
+    }
+
+    const acceptedRaw = await AsyncStorage.getItem(STORAGE_KEYS.ACCEPTED_PACKS);
+    if (acceptedRaw) {
+      const acceptedPacks = JSON.parse(acceptedRaw) as Array<{ id: string; version: number }>;
+      for (const pack of acceptedPacks) {
+        await setPackStatusDB(pack.id, "accepted");
+      }
+    }
+
+    const dismissedRaw = await AsyncStorage.getItem(STORAGE_KEYS.DISMISSED_PACKS);
+    if (dismissedRaw) {
+      const dismissedPacks = JSON.parse(dismissedRaw) as Array<{ id: string; version: number }>;
+      for (const pack of dismissedPacks) {
+        await setPackStatusDB(pack.id, "dismissed");
+      }
+    }
+
+    const userDictRaw = await AsyncStorage.getItem(STORAGE_KEYS.USER_DICTIONARY);
+    if (userDictRaw) {
+      const userDict = JSON.parse(userDictRaw) as { words: Word[]; editedWords: Record<string, Word> };
+      for (const word of userDict.words || []) {
+        await addWordToDictionaryDB({
+          english: word.english,
+          mongolian: word.mongolian,
+          pronunciation: word.pronunciation,
+          category: word.category,
+        });
+      }
+    }
+
+    console.log("Migration from AsyncStorage complete");
+  } catch (error) {
+    console.error("Migration from AsyncStorage failed:", error);
+  }
+}
+
+export async function getDailyProgress(): Promise<DailyProgress> {
+  try {
+    const row = await getDailyProgressFromDB();
+    const todayStr = getTodayString();
+    
+    if (row && row.date === todayStr) {
+      return {
+        date: row.date,
+        englishToMongolianCompleted: row.english_to_mongolian_completed === 1,
+        mongolianToEnglishCompleted: row.mongolian_to_english_completed === 1,
+        englishToMongolianProgress: JSON.parse(row.english_to_mongolian_progress),
+        mongolianToEnglishProgress: JSON.parse(row.mongolian_to_english_progress),
+      };
+    }
+    
     return {
-      date: getTodayString(),
+      date: todayStr,
       englishToMongolianCompleted: false,
       mongolianToEnglishCompleted: false,
       englishToMongolianProgress: [],
@@ -73,7 +188,7 @@ export async function getDailyProgress(): Promise<DailyProgress> {
 
 export async function saveDailyProgress(progress: DailyProgress): Promise<void> {
   try {
-    await AsyncStorage.setItem(STORAGE_KEYS.DAILY_PROGRESS, JSON.stringify(progress));
+    await saveDailyProgressToDB(progress);
   } catch (error) {
     console.error("Failed to save daily progress:", error);
   }
@@ -81,13 +196,23 @@ export async function saveDailyProgress(progress: DailyProgress): Promise<void> 
 
 export async function getExtraWordsSession(): Promise<ExtraWordsSession | null> {
   try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEYS.EXTRA_WORDS_SESSION);
-    if (stored) {
-      const session = JSON.parse(stored) as ExtraWordsSession;
-      if (session.date === getTodayString()) {
-        return session;
-      }
-      await AsyncStorage.removeItem(STORAGE_KEYS.EXTRA_WORDS_SESSION);
+    const row = await getExtraWordsSessionFromDB();
+    const todayStr = getTodayString();
+    
+    if (row && row.date === todayStr) {
+      return {
+        sessionId: row.session_id,
+        date: row.date,
+        words: JSON.parse(row.words),
+        englishToMongolianCompleted: row.english_to_mongolian_completed === 1,
+        mongolianToEnglishCompleted: row.mongolian_to_english_completed === 1,
+        englishToMongolianProgress: JSON.parse(row.english_to_mongolian_progress),
+        mongolianToEnglishProgress: JSON.parse(row.mongolian_to_english_progress),
+      };
+    }
+    
+    if (row) {
+      await clearExtraWordsSessionDB();
     }
     return null;
   } catch {
@@ -97,7 +222,7 @@ export async function getExtraWordsSession(): Promise<ExtraWordsSession | null> 
 
 export async function saveExtraWordsSession(session: ExtraWordsSession): Promise<void> {
   try {
-    await AsyncStorage.setItem(STORAGE_KEYS.EXTRA_WORDS_SESSION, JSON.stringify(session));
+    await saveExtraWordsSessionToDB(session);
   } catch (error) {
     console.error("Failed to save extra words session:", error);
   }
@@ -105,7 +230,7 @@ export async function saveExtraWordsSession(session: ExtraWordsSession): Promise
 
 export async function clearExtraWordsSession(): Promise<void> {
   try {
-    await AsyncStorage.removeItem(STORAGE_KEYS.EXTRA_WORDS_SESSION);
+    await clearExtraWordsSessionDB();
   } catch (error) {
     console.error("Failed to clear extra words session:", error);
   }
@@ -133,11 +258,12 @@ export async function saveThemePreference(theme: "light" | "dark" | "system"): P
 
 export async function getWordConfidence(): Promise<WordConfidence> {
   try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEYS.WORD_CONFIDENCE);
-    if (stored) {
-      return JSON.parse(stored) as WordConfidence;
+    const data = await getWordConfidenceFromDB();
+    const result: WordConfidence = {};
+    for (const [wordId, level] of Object.entries(data)) {
+      result[parseInt(wordId, 10)] = level as ConfidenceLevel;
     }
-    return {};
+    return result;
   } catch {
     return {};
   }
@@ -145,7 +271,9 @@ export async function getWordConfidence(): Promise<WordConfidence> {
 
 export async function saveWordConfidence(confidence: WordConfidence): Promise<void> {
   try {
-    await AsyncStorage.setItem(STORAGE_KEYS.WORD_CONFIDENCE, JSON.stringify(confidence));
+    for (const [wordId, level] of Object.entries(confidence)) {
+      await saveWordConfidenceToDB(parseInt(wordId, 10), level);
+    }
   } catch (error) {
     console.error("Failed to save word confidence:", error);
   }
@@ -155,10 +283,8 @@ export async function updateWordConfidenceLevel(
   wordId: number,
   level: ConfidenceLevel
 ): Promise<WordConfidence> {
-  const current = await getWordConfidence();
-  const updated = { ...current, [wordId]: level };
-  await saveWordConfidence(updated);
-  return updated;
+  await saveWordConfidenceToDB(wordId, level);
+  return getWordConfidence();
 }
 
 export interface UserDictionary {
@@ -169,37 +295,35 @@ export interface UserDictionary {
 
 export async function getUserDictionary(): Promise<UserDictionary> {
   try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEYS.USER_DICTIONARY);
-    if (stored) {
-      const dict = JSON.parse(stored) as UserDictionary;
-      const userCreatedIds = dict.words
-        .map((w) => w.id)
-        .filter((id) => id >= 1000 && id < 100000);
-      const maxUserCreatedId = userCreatedIds.length > 0 ? Math.max(...userCreatedIds) : 999;
-      dict.nextId = Math.max(dict.nextId ?? 1000, maxUserCreatedId + 1);
-      return dict;
-    }
-    return { words: [], editedWords: {}, nextId: 1000 };
+    const rows = await getUserDictionaryFromDB();
+    const words: Word[] = rows.map(row => ({
+      id: row.id + 1000,
+      english: row.english,
+      mongolian: row.mongolian,
+      pronunciation: row.pronunciation ?? "",
+      category: row.category,
+    }));
+    
+    const userCreatedIds = words.map(w => w.id).filter(id => id >= 1000 && id < 100000);
+    const maxUserCreatedId = userCreatedIds.length > 0 ? Math.max(...userCreatedIds) : 999;
+    
+    return {
+      words,
+      editedWords: {},
+      nextId: Math.max(1000, maxUserCreatedId + 1),
+    };
   } catch {
     return { words: [], editedWords: {}, nextId: 1000 };
   }
 }
 
 export async function saveUserDictionary(dict: UserDictionary): Promise<void> {
-  try {
-    await AsyncStorage.setItem(STORAGE_KEYS.USER_DICTIONARY, JSON.stringify(dict));
-  } catch (error) {
-    console.error("Failed to save user dictionary:", error);
-  }
+  console.log("saveUserDictionary called - individual operations now handled by specific functions");
 }
 
 export async function getDeletedWordIds(): Promise<number[]> {
   try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEYS.DELETED_WORD_IDS);
-    if (stored) {
-      return JSON.parse(stored) as number[];
-    }
-    return [];
+    return await getDeletedWordIdsFromDB();
   } catch {
     return [];
   }
@@ -207,105 +331,107 @@ export async function getDeletedWordIds(): Promise<number[]> {
 
 export async function saveDeletedWordIds(ids: number[]): Promise<void> {
   try {
-    await AsyncStorage.setItem(STORAGE_KEYS.DELETED_WORD_IDS, JSON.stringify(ids));
+    for (const id of ids) {
+      await addDeletedWordDB(id);
+    }
   } catch (error) {
     console.error("Failed to save deleted word IDs:", error);
   }
 }
 
 export async function addWord(word: Omit<Word, "id">): Promise<Word> {
-  const dict = await getUserDictionary();
-  const newWord: Word = {
-    id: dict.nextId,
+  const dbId = await addWordToDictionaryDB({
+    english: word.english,
+    mongolian: word.mongolian,
+    pronunciation: word.pronunciation,
+    category: word.category,
+  });
+  
+  return {
+    id: dbId + 1000,
     ...word,
   };
-  dict.words.push(newWord);
-  dict.nextId += 1;
-  await saveUserDictionary(dict);
-  return newWord;
 }
 
 export async function updateWord(word: Word): Promise<void> {
   const dict = await getUserDictionary();
-  const userWordIndex = dict.words.findIndex((w) => w.id === word.id);
-  if (userWordIndex >= 0) {
-    dict.words[userWordIndex] = word;
-  } else {
-    dict.editedWords[word.id] = word;
+  const existingWord = dict.words.find(w => w.id === word.id);
+  if (existingWord) {
+    const dbId = word.id - 1000;
+    await removeWordFromDictionaryDB(dbId);
+    await addWordToDictionaryDB({
+      english: word.english,
+      mongolian: word.mongolian,
+      pronunciation: word.pronunciation,
+      category: word.category,
+    });
   }
-  await saveUserDictionary(dict);
 }
 
 export async function getUpdatedWord(wordId: number, baseWord: Word): Promise<Word> {
   const dict = await getUserDictionary();
-  const userWord = dict.words.find((w) => w.id === wordId);
+  const userWord = dict.words.find(w => w.id === wordId);
   if (userWord) {
     return userWord;
-  }
-  const editedWord = dict.editedWords[wordId];
-  if (editedWord) {
-    return editedWord;
   }
   return baseWord;
 }
 
 export async function deleteWord(wordId: number): Promise<void> {
   const dict = await getUserDictionary();
-  const userWordIndex = dict.words.findIndex((w) => w.id === wordId);
-  if (userWordIndex >= 0) {
-    dict.words.splice(userWordIndex, 1);
-    await saveUserDictionary(dict);
+  const userWord = dict.words.find(w => w.id === wordId);
+  
+  if (userWord) {
+    const dbId = wordId - 1000;
+    await removeWordFromDictionaryDB(dbId);
   } else {
-    const deletedIds = await getDeletedWordIds();
-    if (!deletedIds.includes(wordId)) {
-      deletedIds.push(wordId);
-      await saveDeletedWordIds(deletedIds);
-    }
+    await addDeletedWordDB(wordId);
   }
+  
   const confidence = await getWordConfidence();
   if (confidence[wordId]) {
     delete confidence[wordId];
-    await saveWordConfidence(confidence);
   }
 }
 
 export type BundleStateMap = Record<string, number>;
 
-async function getBundleMap(key: string): Promise<BundleStateMap> {
+export async function getBundleAppliedMap(): Promise<BundleStateMap> {
   try {
-    const raw = await AsyncStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as BundleStateMap) : {};
+    const packStatus = await getPackStatusFromDB();
+    const result: BundleStateMap = {};
+    for (const [packId, status] of Object.entries(packStatus)) {
+      if (status === "accepted") {
+        result[packId] = Date.now();
+      }
+    }
+    return result;
   } catch {
     return {};
   }
 }
 
-async function setBundleMap(key: string, map: BundleStateMap): Promise<void> {
+export async function getBundleDismissedMap(): Promise<BundleStateMap> {
   try {
-    await AsyncStorage.setItem(key, JSON.stringify(map));
-  } catch (error) {
-    console.error("Failed to save bundle map:", error);
+    const packStatus = await getPackStatusFromDB();
+    const result: BundleStateMap = {};
+    for (const [packId, status] of Object.entries(packStatus)) {
+      if (status === "dismissed") {
+        result[packId] = Date.now();
+      }
+    }
+    return result;
+  } catch {
+    return {};
   }
 }
 
-export async function getBundleAppliedMap(): Promise<BundleStateMap> {
-  return getBundleMap(STORAGE_KEYS.BUNDLE_APPLIED);
-}
-
-export async function getBundleDismissedMap(): Promise<BundleStateMap> {
-  return getBundleMap(STORAGE_KEYS.BUNDLE_DISMISSED);
-}
-
 export async function markBundleApplied(bundleId: string): Promise<void> {
-  const map = await getBundleAppliedMap();
-  map[bundleId] = Date.now();
-  await setBundleMap(STORAGE_KEYS.BUNDLE_APPLIED, map);
+  await setPackStatusDB(bundleId, "accepted");
 }
 
 export async function markBundleDismissed(bundleId: string): Promise<void> {
-  const map = await getBundleDismissedMap();
-  map[bundleId] = Date.now();
-  await setBundleMap(STORAGE_KEYS.BUNDLE_DISMISSED, map);
+  await setPackStatusDB(bundleId, "dismissed");
 }
 
 export type WordBundle = {
@@ -334,12 +460,15 @@ export async function applyWordBundle(
       skipped++;
       continue;
     }
-    dict.words.push(w);
-    existingIds.add(w.id);
+    await addWordToDictionaryDB({
+      english: w.english,
+      mongolian: w.mongolian,
+      pronunciation: w.pronunciation,
+      category: w.category,
+    });
     added++;
   }
 
-  await saveUserDictionary(dict);
   await markBundleApplied(bundle.bundleId);
 
   return { added, skipped };
@@ -360,10 +489,6 @@ export interface StreakData {
   streakFreezeAvailable: boolean;
   streakFreezeUsedDate: string | null;
   history: DayRecord[];
-}
-
-function getDateString(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function getDefaultStreakData(): StreakData {
@@ -392,20 +517,34 @@ function isSameWeek(date1: string, date2: string): boolean {
 
 export async function getStreakData(): Promise<StreakData> {
   try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEYS.STREAK_DATA);
-    if (stored) {
-      const data = JSON.parse(stored) as StreakData;
-      
-      const today = getDateString(new Date());
-      if (data.streakFreezeUsedDate && !isSameWeek(data.streakFreezeUsedDate, today)) {
-        data.streakFreezeAvailable = true;
-        data.streakFreezeUsedDate = null;
-        await saveStreakData(data);
-      }
-      
-      return data;
+    const data = await getStreakDataFromDB();
+    const today = getDateString(new Date());
+    
+    if (data.streakFreezeUsedDate && !isSameWeek(data.streakFreezeUsedDate, today)) {
+      data.streakFreezeAvailable = true;
+      data.streakFreezeUsedDate = null;
+      await saveStreakData({
+        ...data,
+        history: data.history.map(h => ({
+          date: h.date,
+          status: h.status as DayStatus,
+          wordsCompleted: h.wordsCompleted,
+        })),
+      });
     }
-    return getDefaultStreakData();
+    
+    return {
+      currentStreak: data.currentStreak,
+      longestStreak: data.longestStreak,
+      lastCompletedDate: data.lastCompletedDate,
+      streakFreezeAvailable: data.streakFreezeAvailable,
+      streakFreezeUsedDate: data.streakFreezeUsedDate,
+      history: data.history.map(h => ({
+        date: h.date,
+        status: h.status as DayStatus,
+        wordsCompleted: h.wordsCompleted,
+      })),
+    };
   } catch {
     return getDefaultStreakData();
   }
@@ -413,7 +552,18 @@ export async function getStreakData(): Promise<StreakData> {
 
 export async function saveStreakData(data: StreakData): Promise<void> {
   try {
-    await AsyncStorage.setItem(STORAGE_KEYS.STREAK_DATA, JSON.stringify(data));
+    await saveStreakDataToDB({
+      currentStreak: data.currentStreak,
+      longestStreak: data.longestStreak,
+      lastCompletedDate: data.lastCompletedDate,
+      streakFreezeAvailable: data.streakFreezeAvailable,
+      streakFreezeUsedDate: data.streakFreezeUsedDate,
+      history: data.history.map(h => ({
+        date: h.date,
+        status: h.status,
+        wordsCompleted: h.wordsCompleted,
+      })),
+    });
   } catch (error) {
     console.error("Failed to save streak data:", error);
   }
@@ -423,8 +573,8 @@ export async function resetTodayProgress(): Promise<void> {
   try {
     const today = getDateString(new Date());
     
-    await AsyncStorage.removeItem(STORAGE_KEYS.DAILY_PROGRESS);
-    await AsyncStorage.removeItem(STORAGE_KEYS.EXTRA_WORDS_SESSION);
+    await clearDailyProgressDB();
+    await clearExtraWordsSessionDB();
     
     const streakData = await getStreakData();
     streakData.history = streakData.history.filter(h => h.date !== today);
@@ -522,7 +672,6 @@ export async function checkAndUpdateStreak(wordsCompletedToday: number): Promise
     data.currentStreak = 1;
     streakIncremented = true;
   } else if (isToday(data.lastCompletedDate)) {
-    // Already completed today, just update word count
   } else if (isYesterday(data.lastCompletedDate)) {
     data.currentStreak += 1;
     streakIncremented = true;
@@ -629,8 +778,14 @@ export type AcceptedPack = { id: string; version: number };
 
 export async function getAcceptedPacks(): Promise<AcceptedPack[]> {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEYS.ACCEPTED_PACKS);
-    return raw ? (JSON.parse(raw) as AcceptedPack[]) : [];
+    const packStatus = await getPackStatusFromDB();
+    const result: AcceptedPack[] = [];
+    for (const [packId, status] of Object.entries(packStatus)) {
+      if (status === "accepted") {
+        result.push({ id: packId, version: 1 });
+      }
+    }
+    return result;
   } catch {
     return [];
   }
@@ -638,21 +793,16 @@ export async function getAcceptedPacks(): Promise<AcceptedPack[]> {
 
 export async function saveAcceptedPacks(packs: AcceptedPack[]): Promise<void> {
   try {
-    await AsyncStorage.setItem(STORAGE_KEYS.ACCEPTED_PACKS, JSON.stringify(packs));
+    for (const pack of packs) {
+      await setPackStatusDB(pack.id, "accepted");
+    }
   } catch (error) {
     console.error("Failed to save accepted packs:", error);
   }
 }
 
 export async function acceptPack(packId: string, version: number): Promise<void> {
-  const packs = await getAcceptedPacks();
-  const existingIndex = packs.findIndex((p) => p.id === packId);
-  if (existingIndex >= 0) {
-    packs[existingIndex].version = version;
-  } else {
-    packs.push({ id: packId, version });
-  }
-  await saveAcceptedPacks(packs);
+  await setPackStatusDB(packId, "accepted");
 }
 
 export async function isPackAccepted(packId: string): Promise<AcceptedPack | null> {
@@ -664,8 +814,14 @@ export type DismissedPack = { id: string; version: number; timestamp: number };
 
 export async function getDismissedPacks(): Promise<DismissedPack[]> {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEYS.DISMISSED_PACKS);
-    return raw ? (JSON.parse(raw) as DismissedPack[]) : [];
+    const packStatus = await getPackStatusFromDB();
+    const result: DismissedPack[] = [];
+    for (const [packId, status] of Object.entries(packStatus)) {
+      if (status === "dismissed") {
+        result.push({ id: packId, version: 1, timestamp: Date.now() });
+      }
+    }
+    return result;
   } catch {
     return [];
   }
@@ -673,25 +829,19 @@ export async function getDismissedPacks(): Promise<DismissedPack[]> {
 
 export async function saveDismissedPacks(packs: DismissedPack[]): Promise<void> {
   try {
-    await AsyncStorage.setItem(STORAGE_KEYS.DISMISSED_PACKS, JSON.stringify(packs));
+    for (const pack of packs) {
+      await setPackStatusDB(pack.id, "dismissed");
+    }
   } catch (error) {
     console.error("Failed to save dismissed packs:", error);
   }
 }
 
 export async function dismissPack(packId: string, version: number): Promise<void> {
-  const packs = await getDismissedPacks();
-  const existingIndex = packs.findIndex((p) => p.id === packId);
-  if (existingIndex >= 0) {
-    packs[existingIndex] = { id: packId, version, timestamp: Date.now() };
-  } else {
-    packs.push({ id: packId, version, timestamp: Date.now() });
-  }
-  await saveDismissedPacks(packs);
+  await setPackStatusDB(packId, "dismissed");
 }
 
 export async function isPackDismissed(packId: string, version: number): Promise<boolean> {
-  const packs = await getDismissedPacks();
-  const dismissed = packs.find((p) => p.id === packId);
-  return dismissed ? dismissed.version === version : false;
+  const packStatus = await getPackStatusFromDB();
+  return packStatus[packId] === "dismissed";
 }

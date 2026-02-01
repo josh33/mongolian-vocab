@@ -1,10 +1,19 @@
 import * as SQLite from "expo-sqlite";
+import { Platform } from "react-native";
 
 const DATABASE_NAME = "mongolian_vocab.db";
 
 let db: SQLite.SQLiteDatabase | null = null;
 
-export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
+export function isNativePlatform(): boolean {
+  return Platform.OS === "ios" || Platform.OS === "android";
+}
+
+export async function getDatabase(): Promise<SQLite.SQLiteDatabase | null> {
+  if (!isNativePlatform()) {
+    return null;
+  }
+  
   if (!db) {
     db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     await initializeTables(db);

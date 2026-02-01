@@ -21,6 +21,7 @@ import {
   clearExtraWordsSessionDB,
   hasMigratedFromAsyncStorage,
   markMigrationComplete,
+  isNativePlatform,
 } from "./database";
 
 const STORAGE_KEYS = {
@@ -72,6 +73,11 @@ function getDateString(date: Date): string {
 
 export async function initializeStorage(): Promise<void> {
   try {
+    if (!isNativePlatform()) {
+      console.log("Web platform detected - using AsyncStorage");
+      return;
+    }
+    
     await getDatabase();
     const migrated = await hasMigratedFromAsyncStorage();
     if (!migrated) {
@@ -154,9 +160,28 @@ async function migrateFromAsyncStorage(): Promise<void> {
 }
 
 export async function getDailyProgress(): Promise<DailyProgress> {
+  const todayStr = getTodayString();
+  const defaultProgress: DailyProgress = {
+    date: todayStr,
+    englishToMongolianCompleted: false,
+    mongolianToEnglishCompleted: false,
+    englishToMongolianProgress: [],
+    mongolianToEnglishProgress: [],
+  };
+
   try {
+    if (!isNativePlatform()) {
+      const stored = await AsyncStorage.getItem(STORAGE_KEYS.DAILY_PROGRESS);
+      if (stored) {
+        const progress = JSON.parse(stored) as DailyProgress;
+        if (progress.date === todayStr) {
+          return progress;
+        }
+      }
+      return defaultProgress;
+    }
+
     const row = await getDailyProgressFromDB();
-    const todayStr = getTodayString();
     
     if (row && row.date === todayStr) {
       return {
@@ -168,26 +193,18 @@ export async function getDailyProgress(): Promise<DailyProgress> {
       };
     }
     
-    return {
-      date: todayStr,
-      englishToMongolianCompleted: false,
-      mongolianToEnglishCompleted: false,
-      englishToMongolianProgress: [],
-      mongolianToEnglishProgress: [],
-    };
+    return defaultProgress;
   } catch {
-    return {
-      date: getTodayString(),
-      englishToMongolianCompleted: false,
-      mongolianToEnglishCompleted: false,
-      englishToMongolianProgress: [],
-      mongolianToEnglishProgress: [],
-    };
+    return defaultProgress;
   }
 }
 
 export async function saveDailyProgress(progress: DailyProgress): Promise<void> {
   try {
+    if (!isNativePlatform()) {
+      await AsyncStorage.setItem(STORAGE_KEYS.DAILY_PROGRESS, JSON.stringify(progress));
+      return;
+    }
     await saveDailyProgressToDB(progress);
   } catch (error) {
     console.error("Failed to save daily progress:", error);
@@ -195,9 +212,22 @@ export async function saveDailyProgress(progress: DailyProgress): Promise<void> 
 }
 
 export async function getExtraWordsSession(): Promise<ExtraWordsSession | null> {
+  const todayStr = getTodayString();
+  
   try {
+    if (!isNativePlatform()) {
+      const stored = await AsyncStorage.getItem(STORAGE_KEYS.EXTRA_WORDS_SESSION);
+      if (stored) {
+        const session = JSON.parse(stored) as ExtraWordsSession;
+        if (session.date === todayStr) {
+          return session;
+        }
+        await AsyncStorage.removeItem(STORAGE_KEYS.EXTRA_WORDS_SESSION);
+      }
+      return null;
+    }
+
     const row = await getExtraWordsSessionFromDB();
-    const todayStr = getTodayString();
     
     if (row && row.date === todayStr) {
       return {
@@ -222,6 +252,10 @@ export async function getExtraWordsSession(): Promise<ExtraWordsSession | null> 
 
 export async function saveExtraWordsSession(session: ExtraWordsSession): Promise<void> {
   try {
+    if (!isNativePlatform()) {
+      await AsyncStorage.setItem(STORAGE_KEYS.EXTRA_WORDS_SESSION, JSON.stringify(session));
+      return;
+    }
     await saveExtraWordsSessionToDB(session);
   } catch (error) {
     console.error("Failed to save extra words session:", error);
@@ -230,6 +264,10 @@ export async function saveExtraWordsSession(session: ExtraWordsSession): Promise
 
 export async function clearExtraWordsSession(): Promise<void> {
   try {
+    if (!isNativePlatform()) {
+      await AsyncStorage.removeItem(STORAGE_KEYS.EXTRA_WORDS_SESSION);
+      return;
+    }
     await clearExtraWordsSessionDB();
   } catch (error) {
     console.error("Failed to clear extra words session:", error);
@@ -258,6 +296,14 @@ export async function saveThemePreference(theme: "light" | "dark" | "system"): P
 
 export async function getWordConfidence(): Promise<WordConfidence> {
   try {
+    if (!isNativePlatform()) {
+      const stored = await AsyncStorage.getItem(STORAGE_KEYS.WORD_CONFIDENCE);
+      if (stored) {
+        return JSON.parse(stored) as WordConfidence;
+      }
+      return {};
+    }
+    
     const data = await getWordConfidenceFromDB();
     const result: WordConfidence = {};
     for (const [wordId, level] of Object.entries(data)) {
@@ -271,6 +317,10 @@ export async function getWordConfidence(): Promise<WordConfidence> {
 
 export async function saveWordConfidence(confidence: WordConfidence): Promise<void> {
   try {
+    if (!isNativePlatform()) {
+      await AsyncStorage.setItem(STORAGE_KEYS.WORD_CONFIDENCE, JSON.stringify(confidence));
+      return;
+    }
     for (const [wordId, level] of Object.entries(confidence)) {
       await saveWordConfidenceToDB(parseInt(wordId, 10), level);
     }
@@ -283,6 +333,12 @@ export async function updateWordConfidenceLevel(
   wordId: number,
   level: ConfidenceLevel
 ): Promise<WordConfidence> {
+  if (!isNativePlatform()) {
+    const current = await getWordConfidence();
+    const updated = { ...current, [wordId]: level };
+    await saveWordConfidence(updated);
+    return updated;
+  }
   await saveWordConfidenceToDB(wordId, level);
   return getWordConfidence();
 }
@@ -295,6 +351,20 @@ export interface UserDictionary {
 
 export async function getUserDictionary(): Promise<UserDictionary> {
   try {
+    if (!isNativePlatform()) {
+      const stored = await AsyncStorage.getItem(STORAGE_KEYS.USER_DICTIONARY);
+      if (stored) {
+        const dict = JSON.parse(stored) as UserDictionary;
+        const userCreatedIds = dict.words
+          .map((w) => w.id)
+          .filter((id) => id >= 1000 && id < 100000);
+        const maxUserCreatedId = userCreatedIds.length > 0 ? Math.max(...userCreatedIds) : 999;
+        dict.nextId = Math.max(dict.nextId ?? 1000, maxUserCreatedId + 1);
+        return dict;
+      }
+      return { words: [], editedWords: {}, nextId: 1000 };
+    }
+
     const rows = await getUserDictionaryFromDB();
     const words: Word[] = rows.map(row => ({
       id: row.id + 1000,
@@ -318,11 +388,26 @@ export async function getUserDictionary(): Promise<UserDictionary> {
 }
 
 export async function saveUserDictionary(dict: UserDictionary): Promise<void> {
+  if (!isNativePlatform()) {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.USER_DICTIONARY, JSON.stringify(dict));
+    } catch (error) {
+      console.error("Failed to save user dictionary:", error);
+    }
+    return;
+  }
   console.log("saveUserDictionary called - individual operations now handled by specific functions");
 }
 
 export async function getDeletedWordIds(): Promise<number[]> {
   try {
+    if (!isNativePlatform()) {
+      const stored = await AsyncStorage.getItem(STORAGE_KEYS.DELETED_WORD_IDS);
+      if (stored) {
+        return JSON.parse(stored) as number[];
+      }
+      return [];
+    }
     return await getDeletedWordIdsFromDB();
   } catch {
     return [];
@@ -331,6 +416,10 @@ export async function getDeletedWordIds(): Promise<number[]> {
 
 export async function saveDeletedWordIds(ids: number[]): Promise<void> {
   try {
+    if (!isNativePlatform()) {
+      await AsyncStorage.setItem(STORAGE_KEYS.DELETED_WORD_IDS, JSON.stringify(ids));
+      return;
+    }
     for (const id of ids) {
       await addDeletedWordDB(id);
     }
@@ -340,6 +429,18 @@ export async function saveDeletedWordIds(ids: number[]): Promise<void> {
 }
 
 export async function addWord(word: Omit<Word, "id">): Promise<Word> {
+  if (!isNativePlatform()) {
+    const dict = await getUserDictionary();
+    const newWord: Word = {
+      id: dict.nextId,
+      ...word,
+    };
+    dict.words.push(newWord);
+    dict.nextId += 1;
+    await saveUserDictionary(dict);
+    return newWord;
+  }
+
   const dbId = await addWordToDictionaryDB({
     english: word.english,
     mongolian: word.mongolian,
@@ -355,6 +456,18 @@ export async function addWord(word: Omit<Word, "id">): Promise<Word> {
 
 export async function updateWord(word: Word): Promise<void> {
   const dict = await getUserDictionary();
+  
+  if (!isNativePlatform()) {
+    const userWordIndex = dict.words.findIndex((w) => w.id === word.id);
+    if (userWordIndex >= 0) {
+      dict.words[userWordIndex] = word;
+    } else {
+      dict.editedWords[word.id] = word;
+    }
+    await saveUserDictionary(dict);
+    return;
+  }
+
   const existingWord = dict.words.find(w => w.id === word.id);
   if (existingWord) {
     const dbId = word.id - 1000;
@@ -379,6 +492,27 @@ export async function getUpdatedWord(wordId: number, baseWord: Word): Promise<Wo
 
 export async function deleteWord(wordId: number): Promise<void> {
   const dict = await getUserDictionary();
+  
+  if (!isNativePlatform()) {
+    const userWordIndex = dict.words.findIndex((w) => w.id === wordId);
+    if (userWordIndex >= 0) {
+      dict.words.splice(userWordIndex, 1);
+      await saveUserDictionary(dict);
+    } else {
+      const deletedIds = await getDeletedWordIds();
+      if (!deletedIds.includes(wordId)) {
+        deletedIds.push(wordId);
+        await saveDeletedWordIds(deletedIds);
+      }
+    }
+    const confidence = await getWordConfidence();
+    if (confidence[wordId]) {
+      delete confidence[wordId];
+      await saveWordConfidence(confidence);
+    }
+    return;
+  }
+
   const userWord = dict.words.find(w => w.id === wordId);
   
   if (userWord) {
@@ -396,8 +530,28 @@ export async function deleteWord(wordId: number): Promise<void> {
 
 export type BundleStateMap = Record<string, number>;
 
+async function getBundleMapFromAsync(key: string): Promise<BundleStateMap> {
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as BundleStateMap) : {};
+  } catch {
+    return {};
+  }
+}
+
+async function setBundleMapToAsync(key: string, map: BundleStateMap): Promise<void> {
+  try {
+    await AsyncStorage.setItem(key, JSON.stringify(map));
+  } catch (error) {
+    console.error("Failed to save bundle map:", error);
+  }
+}
+
 export async function getBundleAppliedMap(): Promise<BundleStateMap> {
   try {
+    if (!isNativePlatform()) {
+      return getBundleMapFromAsync(STORAGE_KEYS.BUNDLE_APPLIED);
+    }
     const packStatus = await getPackStatusFromDB();
     const result: BundleStateMap = {};
     for (const [packId, status] of Object.entries(packStatus)) {
@@ -413,6 +567,9 @@ export async function getBundleAppliedMap(): Promise<BundleStateMap> {
 
 export async function getBundleDismissedMap(): Promise<BundleStateMap> {
   try {
+    if (!isNativePlatform()) {
+      return getBundleMapFromAsync(STORAGE_KEYS.BUNDLE_DISMISSED);
+    }
     const packStatus = await getPackStatusFromDB();
     const result: BundleStateMap = {};
     for (const [packId, status] of Object.entries(packStatus)) {
@@ -427,10 +584,22 @@ export async function getBundleDismissedMap(): Promise<BundleStateMap> {
 }
 
 export async function markBundleApplied(bundleId: string): Promise<void> {
+  if (!isNativePlatform()) {
+    const map = await getBundleAppliedMap();
+    map[bundleId] = Date.now();
+    await setBundleMapToAsync(STORAGE_KEYS.BUNDLE_APPLIED, map);
+    return;
+  }
   await setPackStatusDB(bundleId, "accepted");
 }
 
 export async function markBundleDismissed(bundleId: string): Promise<void> {
+  if (!isNativePlatform()) {
+    const map = await getBundleDismissedMap();
+    map[bundleId] = Date.now();
+    await setBundleMapToAsync(STORAGE_KEYS.BUNDLE_DISMISSED, map);
+    return;
+  }
   await setPackStatusDB(bundleId, "dismissed");
 }
 
@@ -517,8 +686,23 @@ function isSameWeek(date1: string, date2: string): boolean {
 
 export async function getStreakData(): Promise<StreakData> {
   try {
-    const data = await getStreakDataFromDB();
     const today = getDateString(new Date());
+
+    if (!isNativePlatform()) {
+      const stored = await AsyncStorage.getItem(STORAGE_KEYS.STREAK_DATA);
+      if (stored) {
+        const data = JSON.parse(stored) as StreakData;
+        if (data.streakFreezeUsedDate && !isSameWeek(data.streakFreezeUsedDate, today)) {
+          data.streakFreezeAvailable = true;
+          data.streakFreezeUsedDate = null;
+          await saveStreakData(data);
+        }
+        return data;
+      }
+      return getDefaultStreakData();
+    }
+
+    const data = await getStreakDataFromDB();
     
     if (data.streakFreezeUsedDate && !isSameWeek(data.streakFreezeUsedDate, today)) {
       data.streakFreezeAvailable = true;
@@ -552,6 +736,10 @@ export async function getStreakData(): Promise<StreakData> {
 
 export async function saveStreakData(data: StreakData): Promise<void> {
   try {
+    if (!isNativePlatform()) {
+      await AsyncStorage.setItem(STORAGE_KEYS.STREAK_DATA, JSON.stringify(data));
+      return;
+    }
     await saveStreakDataToDB({
       currentStreak: data.currentStreak,
       longestStreak: data.longestStreak,
@@ -573,8 +761,13 @@ export async function resetTodayProgress(): Promise<void> {
   try {
     const today = getDateString(new Date());
     
-    await clearDailyProgressDB();
-    await clearExtraWordsSessionDB();
+    if (!isNativePlatform()) {
+      await AsyncStorage.removeItem(STORAGE_KEYS.DAILY_PROGRESS);
+      await AsyncStorage.removeItem(STORAGE_KEYS.EXTRA_WORDS_SESSION);
+    } else {
+      await clearDailyProgressDB();
+      await clearExtraWordsSessionDB();
+    }
     
     const streakData = await getStreakData();
     streakData.history = streakData.history.filter(h => h.date !== today);
@@ -778,6 +971,10 @@ export type AcceptedPack = { id: string; version: number };
 
 export async function getAcceptedPacks(): Promise<AcceptedPack[]> {
   try {
+    if (!isNativePlatform()) {
+      const raw = await AsyncStorage.getItem(STORAGE_KEYS.ACCEPTED_PACKS);
+      return raw ? (JSON.parse(raw) as AcceptedPack[]) : [];
+    }
     const packStatus = await getPackStatusFromDB();
     const result: AcceptedPack[] = [];
     for (const [packId, status] of Object.entries(packStatus)) {
@@ -793,6 +990,10 @@ export async function getAcceptedPacks(): Promise<AcceptedPack[]> {
 
 export async function saveAcceptedPacks(packs: AcceptedPack[]): Promise<void> {
   try {
+    if (!isNativePlatform()) {
+      await AsyncStorage.setItem(STORAGE_KEYS.ACCEPTED_PACKS, JSON.stringify(packs));
+      return;
+    }
     for (const pack of packs) {
       await setPackStatusDB(pack.id, "accepted");
     }
@@ -802,6 +1003,17 @@ export async function saveAcceptedPacks(packs: AcceptedPack[]): Promise<void> {
 }
 
 export async function acceptPack(packId: string, version: number): Promise<void> {
+  if (!isNativePlatform()) {
+    const packs = await getAcceptedPacks();
+    const existingIndex = packs.findIndex((p) => p.id === packId);
+    if (existingIndex >= 0) {
+      packs[existingIndex].version = version;
+    } else {
+      packs.push({ id: packId, version });
+    }
+    await saveAcceptedPacks(packs);
+    return;
+  }
   await setPackStatusDB(packId, "accepted");
 }
 
@@ -814,6 +1026,10 @@ export type DismissedPack = { id: string; version: number; timestamp: number };
 
 export async function getDismissedPacks(): Promise<DismissedPack[]> {
   try {
+    if (!isNativePlatform()) {
+      const raw = await AsyncStorage.getItem(STORAGE_KEYS.DISMISSED_PACKS);
+      return raw ? (JSON.parse(raw) as DismissedPack[]) : [];
+    }
     const packStatus = await getPackStatusFromDB();
     const result: DismissedPack[] = [];
     for (const [packId, status] of Object.entries(packStatus)) {
@@ -829,6 +1045,10 @@ export async function getDismissedPacks(): Promise<DismissedPack[]> {
 
 export async function saveDismissedPacks(packs: DismissedPack[]): Promise<void> {
   try {
+    if (!isNativePlatform()) {
+      await AsyncStorage.setItem(STORAGE_KEYS.DISMISSED_PACKS, JSON.stringify(packs));
+      return;
+    }
     for (const pack of packs) {
       await setPackStatusDB(pack.id, "dismissed");
     }
@@ -838,10 +1058,26 @@ export async function saveDismissedPacks(packs: DismissedPack[]): Promise<void> 
 }
 
 export async function dismissPack(packId: string, version: number): Promise<void> {
+  if (!isNativePlatform()) {
+    const packs = await getDismissedPacks();
+    const existingIndex = packs.findIndex((p) => p.id === packId);
+    if (existingIndex >= 0) {
+      packs[existingIndex] = { id: packId, version, timestamp: Date.now() };
+    } else {
+      packs.push({ id: packId, version, timestamp: Date.now() });
+    }
+    await saveDismissedPacks(packs);
+    return;
+  }
   await setPackStatusDB(packId, "dismissed");
 }
 
 export async function isPackDismissed(packId: string, version: number): Promise<boolean> {
+  if (!isNativePlatform()) {
+    const packs = await getDismissedPacks();
+    const dismissed = packs.find((p) => p.id === packId);
+    return dismissed ? dismissed.version === version : false;
+  }
   const packStatus = await getPackStatusFromDB();
   return packStatus[packId] === "dismissed";
 }

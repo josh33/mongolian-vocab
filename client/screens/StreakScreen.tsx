@@ -271,9 +271,11 @@ const styles = StyleSheet.create({
     height: 80,
   },
   streakCount: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "700",
+    marginTop: Spacing.md,
     marginBottom: Spacing["2xl"],
+    textAlign: "center",
   },
   weekContainer: {
     flexDirection: "row",

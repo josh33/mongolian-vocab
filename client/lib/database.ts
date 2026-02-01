@@ -219,6 +219,17 @@ export async function saveStreakDataToDB(data: {
     ]
   );
   
+  const existingDates = await database.getAllAsync<{ date: string }>(
+    "SELECT date FROM streak_history"
+  );
+  const newDates = new Set(data.history.map(h => h.date));
+  
+  for (const row of existingDates) {
+    if (!newDates.has(row.date)) {
+      await database.runAsync("DELETE FROM streak_history WHERE date = ?", [row.date]);
+    }
+  }
+  
   for (const record of data.history) {
     await database.runAsync(
       `INSERT OR REPLACE INTO streak_history (date, status, words_completed) VALUES (?, ?, ?)`,

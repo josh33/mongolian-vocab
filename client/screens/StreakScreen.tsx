@@ -118,7 +118,7 @@ export default function StreakScreen() {
   }));
 
   const weekDays = getWeekDays();
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString('en-CA');
   const todayFormatted = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
 
   const hasActiveStreak = streakData.currentStreak > 0;

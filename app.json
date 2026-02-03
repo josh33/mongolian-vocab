@@ -2,7 +2,7 @@
   "expo": {
     "name": "Mongolian Vocab",
     "slug": "mongolian-vocab",
-    "version": "1.0.10",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "mongolianvocab",

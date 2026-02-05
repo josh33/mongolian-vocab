@@ -62,6 +62,13 @@ export default function TodayScreen() {
 
   const dailyBothCompleted = isBothModesCompleted(false);
   const extraBothCompleted = hasExtraSession && isBothModesCompleted(true);
+  const getProgressCount = (mode: "englishToMongolian" | "mongolianToEnglish", isExtra: boolean) =>
+    getProgressForMode(mode, isExtra).length;
+  const isModeDone = (
+    mode: "englishToMongolian" | "mongolianToEnglish",
+    isExtra: boolean,
+    total: number
+  ) => isModeCompleted(mode, isExtra) || getProgressCount(mode, isExtra) >= total;
 
   return (
     <ScrollView
@@ -106,9 +113,9 @@ export default function TodayScreen() {
         <PracticeModeCard
           title="English → Mongolian"
           subtitle="See English, guess Mongolian"
-          progress={getProgressForMode("englishToMongolian", false).length}
+          progress={getProgressCount("englishToMongolian", false)}
           total={dailyWords.length}
-          isCompleted={isModeCompleted("englishToMongolian", false)}
+          isCompleted={isModeDone("englishToMongolian", false, dailyWords.length)}
           onPress={() => handleStartPractice("englishToMongolian", false)}
           testID="button-english-to-mongolian"
         />
@@ -116,9 +123,9 @@ export default function TodayScreen() {
         <PracticeModeCard
           title="Mongolian → English"
           subtitle="See Mongolian, guess English"
-          progress={getProgressForMode("mongolianToEnglish", false).length}
+          progress={getProgressCount("mongolianToEnglish", false)}
           total={dailyWords.length}
-          isCompleted={isModeCompleted("mongolianToEnglish", false)}
+          isCompleted={isModeDone("mongolianToEnglish", false, dailyWords.length)}
           onPress={() => handleStartPractice("mongolianToEnglish", false)}
           testID="button-mongolian-to-english"
         />
@@ -147,9 +154,9 @@ export default function TodayScreen() {
             <PracticeModeCard
               title="English → Mongolian"
               subtitle="Extra words practice"
-              progress={getProgressForMode("englishToMongolian", true).length}
+              progress={getProgressCount("englishToMongolian", true)}
               total={extraSession.words.length}
-              isCompleted={isModeCompleted("englishToMongolian", true)}
+              isCompleted={isModeDone("englishToMongolian", true, extraSession.words.length)}
               onPress={() => handleStartPractice("englishToMongolian", true)}
               testID="button-extra-english-to-mongolian"
             />
@@ -157,9 +164,9 @@ export default function TodayScreen() {
             <PracticeModeCard
               title="Mongolian → English"
               subtitle="Extra words practice"
-              progress={getProgressForMode("mongolianToEnglish", true).length}
+              progress={getProgressCount("mongolianToEnglish", true)}
               total={extraSession.words.length}
-              isCompleted={isModeCompleted("mongolianToEnglish", true)}
+              isCompleted={isModeDone("mongolianToEnglish", true, extraSession.words.length)}
               onPress={() => handleStartPractice("mongolianToEnglish", true)}
               testID="button-extra-mongolian-to-english"
             />

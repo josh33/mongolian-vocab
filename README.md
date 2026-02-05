@@ -2,18 +2,19 @@
 
 **Mongolian Vocab** is a simple, offline-first iOS app for learning and practicing Mongolian–English vocabulary.
 
-The app is intentionally minimal: no accounts, no tracking, no ads, and no backend services. All vocabulary and learning progress are stored locally on the device.
+The app is intentionally minimal: no accounts, no tracking, no ads. All vocabulary and learning progress are stored locally on the device.
 
 ---
 
 ## Features
 
-- 📖 Built-in Mongolian ↔ English dictionary
-- 🧠 Daily vocabulary practice
+- 📖 Built-in Mongolian ↔ English dictionary (base list + optional packs + custom words)
+- 🧠 Daily vocabulary practice (two modes: English → Mongolian, Mongolian → English)
 - ✍️ Add, edit, or delete custom words
 - 📊 Track confidence per word (learning / familiar / mastered)
+- 🧊 Streaks with weekly streak freeze mechanic
 - 🌙 Light and dark mode support
-- 🔒 Fully offline — no network required
+- 🔒 Fully offline — no network required (optional OTA updates for new packs)
 
 ---
 
@@ -36,9 +37,38 @@ https://josh33.com/mongolian-vocab/privacy.html
 - **Expo (Managed Workflow)**
 - **React Native**
 - **TypeScript**
-- **AsyncStorage** for local persistence
+- **expo-sqlite** for local persistence on native platforms
+- **AsyncStorage** fallback on web
 - **EAS Build + TestFlight** for iOS distribution
-- **GitHub Actions** for CI builds
+- **GitHub Actions** for CI builds and OTA publishing
+
+## Storage & Data
+
+This app is fully offline. All data lives on-device.
+
+- **Native (iOS/Android):** SQLite via `expo-sqlite`
+- **Web:** AsyncStorage
+- **Migration:** On first native launch, AsyncStorage data is migrated into SQLite automatically
+
+### Dictionary Sources
+
+- **Base dictionary:** embedded in the app bundle
+- **Packs:** versioned vocabulary packs that can be added from the Dictionary Updates screen
+- **Custom words:** created by the user
+
+## Dictionary Packs & OTA Updates
+
+- Packs are versioned and can be previewed, added, dismissed, or upgraded.
+- OTA updates (via `expo-updates`) deliver new pack data when enabled.
+- The “Auto-download New Packs” toggle controls OTA update checks.
+
+## Dictionary Size
+
+The base dictionary contains ~900 words, and grows when you add packs or custom entries.
+
+## Backend
+
+There is no backend API for the vocabulary app. The server in this repo is used only for static web builds and Expo manifest routing.
 
 ---
 

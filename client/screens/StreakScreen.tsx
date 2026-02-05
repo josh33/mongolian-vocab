@@ -13,10 +13,12 @@ import { Feather } from "@expo/vector-icons";
 
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+import { useLocalization } from "@/hooks/useLocalization";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
 import { getWeekDays, getDayStatus, DayStatus } from "@/lib/storage";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
+import { formatDayStreak, getDayLabels } from "@/lib/i18n";
 
 import horseArcherImage from "../../assets/images/horse-archer.png";
 
@@ -97,6 +99,7 @@ export default function StreakScreen() {
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
   const { streakData, refreshStreakData } = useApp();
+  const { t, locale } = useLocalization();
 
   const scale = useSharedValue(0.8);
   const opacity = useSharedValue(0);
@@ -117,7 +120,7 @@ export default function StreakScreen() {
     opacity: opacity.value,
   }));
 
-  const weekDays = getWeekDays();
+  const weekDays = getWeekDays(new Date(), getDayLabels(locale));
   const today = new Date().toLocaleDateString('en-CA');
   const todayFormatted = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
 
@@ -126,12 +129,12 @@ export default function StreakScreen() {
 
   const getMessage = () => {
     if (streakData.currentStreak === 0) {
-      return "Start your journey! Practice 5 words today.";
+      return t("streak.startMessage");
     }
     if (isStreakAtRisk) {
-      return "Practice today to keep your streak alive!";
+      return t("streak.riskMessage");
     }
-    return "You're on a roll! Come back tomorrow to continue.";
+    return t("streak.safeMessage");
   };
 
   const handleClose = () => {
@@ -149,7 +152,7 @@ export default function StreakScreen() {
           <Feather name="x" size={24} color={colors.text} />
         </Pressable>
         <ThemedText style={[styles.headerTitle, { color: colors.text }]}>
-          Streak
+          {t("streak.title")}
         </ThemedText>
         <View style={styles.placeholder} />
       </View>
@@ -175,7 +178,7 @@ export default function StreakScreen() {
           </View>
 
           <ThemedText style={[styles.streakCount, { color: colors.text }]}>
-            {streakData.currentStreak} Day Streak{streakData.currentStreak !== 1 ? "s" : ""}!
+            {formatDayStreak(locale, streakData.currentStreak)}
           </ThemedText>
 
           <View style={styles.weekContainer}>
@@ -200,14 +203,14 @@ export default function StreakScreen() {
                   {streakData.longestStreak}
                 </ThemedText>
                 <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>
-                  Longest Streak
+                  {t("streak.longest")}
                 </ThemedText>
               </View>
               {streakData.streakFreezeAvailable ? (
                 <View style={styles.statItem}>
                   <Feather name="shield" size={24} color={colors.primary} />
                   <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>
-                    Freeze Available
+                    {t("streak.freezeAvailable")}
                   </ThemedText>
                 </View>
               ) : null}
@@ -217,7 +220,7 @@ export default function StreakScreen() {
           <View style={[styles.infoCard, { backgroundColor: colors.backgroundSecondary }]}>
             <Feather name="info" size={18} color={colors.primary} />
             <ThemedText style={[styles.infoText, { color: colors.textSecondary }]}>
-              Practice at least 5 words daily to maintain your streak. Miss a day? Practice 10 words the next day to use your streak freeze!
+              {t("streak.info")}
             </ThemedText>
           </View>
         </Animated.View>

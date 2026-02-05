@@ -15,6 +15,7 @@ import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
+import { useLocalization } from "@/hooks/useLocalization";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { PACKS, DictionaryPackMeta, getPackWords } from "@/data/packs";
 import {
@@ -22,10 +23,9 @@ import {
   getDismissedPacks,
   acceptPack,
   dismissPack,
-  AcceptedPack,
-  DismissedPack,
 } from "@/lib/storage";
 import type { Word } from "@/data/dictionary";
+import { formatWordCount } from "@/lib/i18n";
 
 type PackStatus = "pending" | "accepted" | "dismissed" | "upgrade_available";
 
@@ -40,6 +40,7 @@ export default function DictionaryUpdatesScreen() {
   const headerHeight = useHeaderHeight();
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
+  const { t, locale } = useLocalization();
 
   const [packsWithStatus, setPacksWithStatus] = useState<PackWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -145,14 +146,14 @@ export default function DictionaryUpdatesScreen() {
               </ThemedText>
             </View>
             <ThemedText style={[styles.packWordCount, { color: colors.textSecondary }]}>
-              {pack.wordCount} words
+              {formatWordCount(locale, pack.wordCount)}
             </ThemedText>
           </View>
           {status === "accepted" ? (
             <View style={[styles.statusBadge, { backgroundColor: colors.success + "20" }]}>
               <Feather name="check-circle" size={14} color={colors.success} />
               <ThemedText style={[styles.statusText, { color: colors.success }]}>
-                Added
+                {t("dictionaryUpdates.added")}
               </ThemedText>
             </View>
           ) : null}
@@ -160,14 +161,14 @@ export default function DictionaryUpdatesScreen() {
             <View style={[styles.statusBadge, { backgroundColor: colors.warning + "20" }]}>
               <Feather name="arrow-up-circle" size={14} color={colors.warning} />
               <ThemedText style={[styles.statusText, { color: colors.warning }]}>
-                Update v{acceptedVersion} → v{pack.version}
+                {t("dictionaryUpdates.updateVersion", { from: acceptedVersion ?? "", to: pack.version })}
               </ThemedText>
             </View>
           ) : null}
           {status === "dismissed" ? (
             <View style={[styles.statusBadge, { backgroundColor: colors.textSecondary + "20" }]}>
               <ThemedText style={[styles.statusText, { color: colors.textSecondary }]}>
-                Dismissed
+                {t("dictionaryUpdates.dismissed")}
               </ThemedText>
             </View>
           ) : null}
@@ -191,7 +192,7 @@ export default function DictionaryUpdatesScreen() {
             >
               <Feather name="eye" size={16} color={colors.primary} />
               <ThemedText style={[styles.previewButtonText, { color: colors.primary }]}>
-                Preview
+                {t("dictionaryUpdates.preview")}
               </ThemedText>
             </Pressable>
             <Pressable
@@ -206,7 +207,7 @@ export default function DictionaryUpdatesScreen() {
                 <>
                   <Feather name={status === "upgrade_available" ? "arrow-up" : "plus"} size={16} color="#FFFFFF" />
                   <ThemedText style={styles.addButtonText}>
-                    {status === "upgrade_available" ? "Update" : "Add"}
+                    {status === "upgrade_available" ? t("dictionaryUpdates.update") : t("dictionaryUpdates.add")}
                   </ThemedText>
                 </>
               )}
@@ -266,7 +267,7 @@ export default function DictionaryUpdatesScreen() {
               >
                 <Feather name="check-circle" size={18} color={colors.success} />
                 <ThemedText style={[styles.resultText, { color: colors.success }]}>
-                  {lastResult.packTitle} added ({lastResult.wordCount} words)
+                  {t("dictionaryUpdates.resultAdded", { packTitle: lastResult.packTitle, wordCount: formatWordCount(locale, lastResult.wordCount) })}
                 </ThemedText>
               </View>
             ) : null}
@@ -278,18 +279,18 @@ export default function DictionaryUpdatesScreen() {
               <View style={styles.emptyState}>
                 <Feather name="inbox" size={48} color={colors.textSecondary} />
                 <ThemedText style={[styles.emptyTitle, { color: colors.text }]}>
-                  No Dictionary Packs
+                  {t("dictionaryUpdates.emptyTitle")}
                 </ThemedText>
                 <ThemedText style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                  New vocabulary packs will appear here when available
+                  {t("dictionaryUpdates.emptySubtitle")}
                 </ThemedText>
               </View>
             ) : (
               <>
-                {renderSection("Updates Available", upgradePacks)}
-                {renderSection("Available Packs", pendingPacks)}
-                {renderSection("Added to Dictionary", acceptedPacks)}
-                {renderSection("Dismissed", dismissedPacks)}
+                {renderSection(t("dictionaryUpdates.updatesAvailable"), upgradePacks)}
+                {renderSection(t("dictionaryUpdates.availablePacks"), pendingPacks)}
+                {renderSection(t("dictionaryUpdates.addedToDictionary"), acceptedPacks)}
+                {renderSection(t("dictionaryUpdates.dismissedSection"), dismissedPacks)}
               </>
             )}
           </View>
@@ -310,7 +311,7 @@ export default function DictionaryUpdatesScreen() {
                 {previewPack?.title}
               </ThemedText>
               <ThemedText style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
-                Version {previewPack?.version}
+                {t("dictionaryUpdates.versionLabel", { version: previewPack?.version ?? "" })}
               </ThemedText>
             </View>
             <Pressable
@@ -363,7 +364,7 @@ export default function DictionaryUpdatesScreen() {
               >
                 <Feather name="plus" size={18} color="#FFFFFF" />
                 <ThemedText style={styles.modalAddButtonText}>
-                  Add {previewPack.wordCount} Words to Dictionary
+                  {t("dictionaryUpdates.addWordsToDictionary", { wordCount: formatWordCount(locale, previewPack.wordCount) })}
                 </ThemedText>
               </Pressable>
             </View>

@@ -37,6 +37,7 @@ const STORAGE_KEYS = {
   ACCEPTED_PACKS: "accepted_packs",
   DISMISSED_PACKS: "dismissed_packs",
   OTA_UPDATES_ENABLED: "ota_updates_enabled",
+  MONGOL_MODE_ENABLED: "mongol_mode_enabled",
 };
 
 export type ConfidenceLevel = "learning" | "familiar" | "mastered";
@@ -932,9 +933,11 @@ export async function checkAndUpdateStreak(wordsCompletedToday: number): Promise
   };
 }
 
-export function getWeekDays(referenceDate: Date = new Date()): { date: string; dayLabel: string }[] {
+export function getWeekDays(
+  referenceDate: Date = new Date(),
+  dayLabels: string[] = ["S", "M", "T", "W", "T", "F", "S"]
+): { date: string; dayLabel: string }[] {
   const days: { date: string; dayLabel: string }[] = [];
-  const dayLabels = ["S", "M", "T", "W", "T", "F", "S"];
   
   const startOfWeek = new Date(referenceDate);
   const currentDay = startOfWeek.getDay();
@@ -1103,5 +1106,22 @@ export async function setOTAUpdatesEnabled(enabled: boolean): Promise<void> {
     await AsyncStorage.setItem(STORAGE_KEYS.OTA_UPDATES_ENABLED, enabled ? "true" : "false");
   } catch (error) {
     console.error("Failed to save OTA updates preference:", error);
+  }
+}
+
+export async function getMongolModeEnabled(): Promise<boolean> {
+  try {
+    const value = await AsyncStorage.getItem(STORAGE_KEYS.MONGOL_MODE_ENABLED);
+    return value === "true";
+  } catch {
+    return false;
+  }
+}
+
+export async function setMongolModeEnabled(enabled: boolean): Promise<void> {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEYS.MONGOL_MODE_ENABLED, enabled ? "true" : "false");
+  } catch (error) {
+    console.error("Failed to save Mongol mode preference:", error);
   }
 }

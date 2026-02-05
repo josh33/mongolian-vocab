@@ -17,6 +17,8 @@ import {
   getStreakData,
   checkAndUpdateStreak,
   initializeStorage,
+  getMongolModeEnabled,
+  setMongolModeEnabled as saveMongolModeEnabled,
 } from "@/lib/storage";
 
 export type PracticeMode = "englishToMongolian" | "mongolianToEnglish";
@@ -35,8 +37,10 @@ interface AppContextType {
   streakData: StreakData;
   lastStreakUpdate: StreakUpdateResult | null;
   themePreference: "light" | "dark" | "system";
+  mongolModeEnabled: boolean;
   isLoading: boolean;
   setThemePreference: (theme: "light" | "dark" | "system") => Promise<void>;
+  setMongolModeEnabled: (enabled: boolean) => Promise<void>;
   markCardCompleted: (mode: PracticeMode, wordId: number, isExtra?: boolean) => Promise<void>;
   markModeCompleted: (mode: PracticeMode, isExtra?: boolean) => Promise<void>;
   getWordsForMode: (mode: PracticeMode, isExtra?: boolean) => Word[];
@@ -51,7 +55,7 @@ interface AppContextType {
   deleteWordDuringStudy: (wordId: number, isExtra: boolean) => Promise<void>;
 }
 
-const AppContext = createContext<AppContextType | undefined>(undefined);
+export const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [dailyWords, setDailyWords] = useState<Word[]>([]);
@@ -73,6 +77,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
   const [lastStreakUpdate, setLastStreakUpdate] = useState<StreakUpdateResult | null>(null);
   const [themePreference, setThemePref] = useState<"light" | "dark" | "system">("system");
+  const [mongolModeEnabled, setMongolModeEnabledState] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const isInitialLoadRef = useRef(true);
 
@@ -81,11 +86,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       await initializeStorage();
       
-      const [progress, extra, theme, streak] = await Promise.all([
+      const [progress, extra, theme, streak, mongolMode] = await Promise.all([
         getDailyProgress(),
         getExtraWordsSession(),
         getThemePreference(),
         getStreakData(),
+        getMongolModeEnabled(),
       ]);
       
       const words = getDailyWords(new Date(), 5);
@@ -94,6 +100,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setExtraSession(extra);
       setThemePref(theme);
       setStreakData(streak);
+      setMongolModeEnabledState(mongolMode);
     } catch (error) {
       console.error("Failed to load data:", error);
     } finally {
@@ -142,6 +149,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setThemePreference = useCallback(async (theme: "light" | "dark" | "system") => {
     setThemePref(theme);
     await saveThemePreference(theme);
+  }, []);
+
+  const setMongolModeEnabled = useCallback(async (enabled: boolean) => {
+    setMongolModeEnabledState(enabled);
+    await saveMongolModeEnabled(enabled);
   }, []);
 
   const markCardCompleted = useCallback(async (mode: PracticeMode, wordId: number, isExtra = false) => {
@@ -321,8 +333,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     streakData,
     lastStreakUpdate,
     themePreference,
+    mongolModeEnabled,
     isLoading,
     setThemePreference,
+    setMongolModeEnabled,
     markCardCompleted,
     markModeCompleted,
     getWordsForMode,
@@ -346,4 +360,8 @@ export function useApp() {
     throw new Error("useApp must be used within an AppProvider");
   }
   return context;
+}
+
+export function useOptionalApp() {
+  return useContext(AppContext);
 }

@@ -2,6 +2,7 @@ import React from "react";
 import { StyleSheet, View } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+import { useLocalization } from "@/hooks/useLocalization";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { ConfidenceLevel } from "@/lib/storage";
 
@@ -9,34 +10,35 @@ interface ConfidenceIndicatorProps {
   level: ConfidenceLevel | null;
 }
 
-const CONFIDENCE_CONFIG = {
-  learning: {
-    label: "Learning",
-    color: "#E57373",
-  },
-  familiar: {
-    label: "Familiar",
-    color: "#FFB74D",
-  },
-  mastered: {
-    label: "Mastered",
-    color: "#81C784",
-  },
-};
-
 export function ConfidenceIndicator({ level }: ConfidenceIndicatorProps) {
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
+  const { t } = useLocalization();
+
+  const confidenceConfig = {
+    learning: {
+      label: t("confidence.learning"),
+      color: "#E57373",
+    },
+    familiar: {
+      label: t("confidence.familiar"),
+      color: "#FFB74D",
+    },
+    mastered: {
+      label: t("confidence.mastered"),
+      color: "#81C784",
+    },
+  };
 
   if (level === null) {
     return (
       <View style={[styles.newBadge, { backgroundColor: colors.secondary }]}>
-        <ThemedText style={styles.newText}>First Time!</ThemedText>
+        <ThemedText style={styles.newText}>{t("confidence.firstTime")}</ThemedText>
       </View>
     );
   }
 
-  const config = CONFIDENCE_CONFIG[level];
+  const config = confidenceConfig[level];
 
   return (
     <View style={[styles.container, { backgroundColor: config.color + "20" }]}>

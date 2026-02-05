@@ -3,6 +3,7 @@ import { StyleSheet, View, Pressable } from "react-native";
 import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+import { useLocalization } from "@/hooks/useLocalization";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { ConfidenceLevel } from "@/lib/storage";
 
@@ -12,19 +13,16 @@ interface ConfidenceButtonsProps {
   onAdvance: () => void;
 }
 
-const CONFIDENCE_OPTIONS: {
-  level: ConfidenceLevel;
-  label: string;
-  color: string;
-}[] = [
-  { level: "learning", label: "Learning", color: "#E57373" },
-  { level: "familiar", label: "Familiar", color: "#FFB74D" },
-  { level: "mastered", label: "Mastered", color: "#81C784" },
-];
-
 export function ConfidenceButtons({ currentLevel, onSelect, onAdvance }: ConfidenceButtonsProps) {
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
+  const { t } = useLocalization();
+
+  const confidenceOptions = [
+    { level: "learning" as const, label: t("confidence.learning"), color: "#E57373" },
+    { level: "familiar" as const, label: t("confidence.familiar"), color: "#FFB74D" },
+    { level: "mastered" as const, label: t("confidence.mastered"), color: "#81C784" },
+  ];
 
   const handlePress = (level: ConfidenceLevel) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -40,10 +38,10 @@ export function ConfidenceButtons({ currentLevel, onSelect, onAdvance }: Confide
   return (
     <View style={styles.container}>
       <ThemedText style={[styles.title, { color: colors.textSecondary }]}>
-        How well do you know this?
+        {t("confidence.question")}
       </ThemedText>
       <View style={styles.buttonsRow}>
-        {CONFIDENCE_OPTIONS.map((option) => {
+        {confidenceOptions.map((option) => {
           const isSelected = currentLevel === option.level;
           return (
             <Pressable
@@ -79,7 +77,7 @@ export function ConfidenceButtons({ currentLevel, onSelect, onAdvance }: Confide
         testID="confidence-skip"
       >
         <ThemedText style={[styles.skipText, { color: colors.textSecondary }]}>
-          Skip
+          {t("confidence.skip")}
         </ThemedText>
       </Pressable>
     </View>

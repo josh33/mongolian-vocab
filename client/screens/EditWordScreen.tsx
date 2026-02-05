@@ -15,6 +15,7 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ThemedText } from "@/components/ThemedText";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { useTheme } from "@/hooks/useTheme";
+import { useLocalization } from "@/hooks/useLocalization";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { Word } from "@/data/dictionary";
 import {
@@ -26,6 +27,7 @@ import {
 } from "@/lib/storage";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { useApp } from "@/context/AppContext";
+import { getCategoryLabel } from "@/lib/i18n";
 
 type Props = NativeStackScreenProps<RootStackParamList, "EditWord">;
 
@@ -49,12 +51,6 @@ const CATEGORIES = [
   "custom",
 ];
 
-const CONFIDENCE_CONFIG = {
-  learning: { label: "Learning", color: "#E57373" },
-  familiar: { label: "Familiar", color: "#FFB74D" },
-  mastered: { label: "Mastered", color: "#81C784" },
-};
-
 export default function EditWordScreen({ navigation, route }: Props) {
   const { word, isNew, fromStudy, isExtra } = route.params;
   const insets = useSafeAreaInsets();
@@ -62,6 +58,13 @@ export default function EditWordScreen({ navigation, route }: Props) {
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
   const { deleteWordDuringStudy } = useApp();
+  const { t, locale } = useLocalization();
+
+  const confidenceConfig = {
+    learning: { label: t("confidence.learning"), color: "#E57373" },
+    familiar: { label: t("confidence.familiar"), color: "#FFB74D" },
+    mastered: { label: t("confidence.mastered"), color: "#81C784" },
+  };
 
   const [english, setEnglish] = useState(word?.english ?? "");
   const [mongolian, setMongolian] = useState(word?.mongolian ?? "");
@@ -132,12 +135,12 @@ export default function EditWordScreen({ navigation, route }: Props) {
       headerRight: () => (
         <Pressable onPress={handleSave} hitSlop={8} testID="save-word-button">
           <ThemedText style={[styles.saveButton, { color: colors.secondary }]}>
-            Save
+            {t("editWord.save")}
           </ThemedText>
         </Pressable>
       ),
     });
-  }, [navigation, english, mongolian, pronunciation, category, colors]);
+  }, [navigation, english, mongolian, pronunciation, category, colors, t]);
 
   return (
     <>
@@ -153,27 +156,27 @@ export default function EditWordScreen({ navigation, route }: Props) {
         {!isNew && confidenceLevel ? (
           <View style={styles.confidenceSection}>
             <ThemedText style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-              Confidence Level
+              {t("editWord.confidenceLevel")}
             </ThemedText>
             <View
               style={[
                 styles.confidenceBadge,
-                { backgroundColor: CONFIDENCE_CONFIG[confidenceLevel].color + "20" },
+                { backgroundColor: confidenceConfig[confidenceLevel].color + "20" },
               ]}
             >
               <View
                 style={[
                   styles.confidenceDot,
-                  { backgroundColor: CONFIDENCE_CONFIG[confidenceLevel].color },
+                  { backgroundColor: confidenceConfig[confidenceLevel].color },
                 ]}
               />
               <ThemedText
                 style={[
                   styles.confidenceText,
-                  { color: CONFIDENCE_CONFIG[confidenceLevel].color },
+                  { color: confidenceConfig[confidenceLevel].color },
                 ]}
               >
-                {CONFIDENCE_CONFIG[confidenceLevel].label}
+                {confidenceConfig[confidenceLevel].label}
               </ThemedText>
             </View>
           </View>
@@ -181,7 +184,7 @@ export default function EditWordScreen({ navigation, route }: Props) {
 
         <View style={styles.fieldContainer}>
           <ThemedText style={[styles.fieldLabel, { color: colors.textSecondary }]}>
-            English <ThemedText style={{ color: colors.secondary }}>*</ThemedText>
+            {t("editWord.englishLabel")} <ThemedText style={{ color: colors.secondary }}>*</ThemedText>
           </ThemedText>
           <TextInput
             style={[
@@ -190,7 +193,7 @@ export default function EditWordScreen({ navigation, route }: Props) {
             ]}
             value={english}
             onChangeText={setEnglish}
-            placeholder="Enter English word or phrase"
+            placeholder={t("editWord.englishPlaceholder")}
             placeholderTextColor={colors.textSecondary}
             autoCapitalize="sentences"
             testID="input-english"
@@ -199,7 +202,7 @@ export default function EditWordScreen({ navigation, route }: Props) {
 
         <View style={styles.fieldContainer}>
           <ThemedText style={[styles.fieldLabel, { color: colors.textSecondary }]}>
-            Mongolian <ThemedText style={{ color: colors.secondary }}>*</ThemedText>
+            {t("editWord.mongolianLabel")} <ThemedText style={{ color: colors.secondary }}>*</ThemedText>
           </ThemedText>
           <TextInput
             style={[
@@ -208,7 +211,7 @@ export default function EditWordScreen({ navigation, route }: Props) {
             ]}
             value={mongolian}
             onChangeText={setMongolian}
-            placeholder="Enter Mongolian translation"
+            placeholder={t("editWord.mongolianPlaceholder")}
             placeholderTextColor={colors.textSecondary}
             testID="input-mongolian"
           />
@@ -216,7 +219,7 @@ export default function EditWordScreen({ navigation, route }: Props) {
 
         <View style={styles.fieldContainer}>
           <ThemedText style={[styles.fieldLabel, { color: colors.textSecondary }]}>
-            Pronunciation
+            {t("editWord.pronunciationLabel")}
           </ThemedText>
           <TextInput
             style={[
@@ -225,7 +228,7 @@ export default function EditWordScreen({ navigation, route }: Props) {
             ]}
             value={pronunciation}
             onChangeText={setPronunciation}
-            placeholder="How to pronounce (optional)"
+            placeholder={t("editWord.pronunciationPlaceholder")}
             placeholderTextColor={colors.textSecondary}
             testID="input-pronunciation"
           />
@@ -233,7 +236,7 @@ export default function EditWordScreen({ navigation, route }: Props) {
 
         <View style={styles.fieldContainer}>
           <ThemedText style={[styles.fieldLabel, { color: colors.textSecondary }]}>
-            Category
+            {t("editWord.categoryLabel")}
           </ThemedText>
           <Pressable
             style={[
@@ -244,7 +247,7 @@ export default function EditWordScreen({ navigation, route }: Props) {
             testID="category-selector"
           >
             <ThemedText style={[styles.categoryText, { color: colors.text }]}>
-              {category.charAt(0).toUpperCase() + category.slice(1)}
+              {getCategoryLabel(locale, category)}
             </ThemedText>
             <Feather
               name={showCategoryPicker ? "chevron-up" : "chevron-down"}
@@ -279,7 +282,7 @@ export default function EditWordScreen({ navigation, route }: Props) {
                       { color: category === cat ? colors.secondary : colors.text },
                     ]}
                   >
-                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                    {getCategoryLabel(locale, cat)}
                   </ThemedText>
                   {category === cat ? (
                     <Feather name="check" size={18} color={colors.secondary} />
@@ -297,17 +300,17 @@ export default function EditWordScreen({ navigation, route }: Props) {
             testID="delete-word-button"
           >
             <Feather name="trash-2" size={20} color="#E57373" />
-            <ThemedText style={styles.deleteText}>Delete Word</ThemedText>
+            <ThemedText style={styles.deleteText}>{t("editWord.deleteWord")}</ThemedText>
           </Pressable>
         ) : null}
       </ScrollView>
 
       <ConfirmModal
         visible={showDeleteModal}
-        title="Delete Word"
-        message={`Are you sure you want to delete "${word?.english ?? ""}"? This action cannot be undone.`}
-        confirmText="Delete"
-        cancelText="Cancel"
+        title={t("editWord.deleteTitle")}
+        message={t("editWord.deleteMessage", { word: word?.english ?? "" })}
+        confirmText={t("editWord.deleteConfirm")}
+        cancelText={t("editWord.cancel")}
         isDestructive
         onConfirm={confirmDelete}
         onCancel={() => setShowDeleteModal(false)}
@@ -315,9 +318,9 @@ export default function EditWordScreen({ navigation, route }: Props) {
 
       <ConfirmModal
         visible={showValidationModal}
-        title="Required Fields"
-        message="Please fill in both English and Mongolian fields."
-        confirmText="OK"
+        title={t("editWord.requiredTitle")}
+        message={t("editWord.requiredMessage")}
+        confirmText={t("editWord.ok")}
         cancelText=""
         onConfirm={() => setShowValidationModal(false)}
         onCancel={() => setShowValidationModal(false)}

@@ -11,9 +11,11 @@ import { ThemedText } from "@/components/ThemedText";
 import { PracticeModeCard } from "@/components/PracticeModeCard";
 import { SecondaryButton } from "@/components/SecondaryButton";
 import { useTheme } from "@/hooks/useTheme";
+import { useLocalization } from "@/hooks/useLocalization";
 import { Colors, Spacing } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
+import { formatWordCount, getDateLocale, getModeLabel, getModeSubtitle } from "@/lib/i18n";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -24,6 +26,7 @@ export default function TodayScreen() {
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
   const navigation = useNavigation<NavigationProp>();
+  const { t, locale } = useLocalization();
 
   const {
     dailyWords,
@@ -44,7 +47,7 @@ export default function TodayScreen() {
   );
 
   const today = new Date();
-  const dateString = today.toLocaleDateString("en-US", {
+  const dateString = today.toLocaleDateString(getDateLocale(locale), {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -92,27 +95,27 @@ export default function TodayScreen() {
             resizeMode="contain"
           />
           <ThemedText style={[styles.celebrationTitle, { color: colors.text }]}>
-            All Done for Today!
+            {t("today.allDoneTitle")}
           </ThemedText>
           <ThemedText style={[styles.celebrationSubtitle, { color: colors.textSecondary }]}>
-            You've completed both practice modes. Great work!
+            {t("today.allDoneSubtitle")}
           </ThemedText>
         </View>
       ) : null}
 
       <View style={styles.sectionHeader}>
         <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
-          Today's Words
+          {t("today.todaysWords")}
         </ThemedText>
         <ThemedText style={[styles.wordCount, { color: colors.textSecondary }]}>
-          {dailyWords.length} words
+          {formatWordCount(locale, dailyWords.length)}
         </ThemedText>
       </View>
 
       <View style={styles.cardsContainer}>
         <PracticeModeCard
-          title="English → Mongolian"
-          subtitle="See English, guess Mongolian"
+          title={getModeLabel(locale, "englishToMongolian")}
+          subtitle={getModeSubtitle(locale, "englishToMongolian")}
           progress={getProgressCount("englishToMongolian", false)}
           total={dailyWords.length}
           isCompleted={isModeDone("englishToMongolian", false, dailyWords.length)}
@@ -121,8 +124,8 @@ export default function TodayScreen() {
         />
 
         <PracticeModeCard
-          title="Mongolian → English"
-          subtitle="See Mongolian, guess English"
+          title={getModeLabel(locale, "mongolianToEnglish")}
+          subtitle={getModeSubtitle(locale, "mongolianToEnglish")}
           progress={getProgressCount("mongolianToEnglish", false)}
           total={dailyWords.length}
           isCompleted={isModeDone("mongolianToEnglish", false, dailyWords.length)}
@@ -135,25 +138,25 @@ export default function TodayScreen() {
         <>
           <View style={[styles.sectionHeader, { marginTop: Spacing["2xl"] }]}>
             <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
-              Extra Practice
+              {t("today.extraPractice")}
             </ThemedText>
             <ThemedText style={[styles.wordCount, { color: colors.textSecondary }]}>
-              {extraSession.words.length} words
+              {formatWordCount(locale, extraSession.words.length)}
             </ThemedText>
           </View>
 
           {extraBothCompleted ? (
             <View style={styles.miniCelebration}>
               <ThemedText style={[styles.miniCelebrationText, { color: colors.success }]}>
-                Extra practice complete!
+                {t("today.extraPracticeComplete")}
               </ThemedText>
             </View>
           ) : null}
 
           <View style={styles.cardsContainer}>
             <PracticeModeCard
-              title="English → Mongolian"
-              subtitle="Extra words practice"
+              title={getModeLabel(locale, "englishToMongolian")}
+              subtitle={t("today.extraWordsPractice")}
               progress={getProgressCount("englishToMongolian", true)}
               total={extraSession.words.length}
               isCompleted={isModeDone("englishToMongolian", true, extraSession.words.length)}
@@ -162,8 +165,8 @@ export default function TodayScreen() {
             />
 
             <PracticeModeCard
-              title="Mongolian → English"
-              subtitle="Extra words practice"
+              title={getModeLabel(locale, "mongolianToEnglish")}
+              subtitle={t("today.extraWordsPractice")}
               progress={getProgressCount("mongolianToEnglish", true)}
               total={extraSession.words.length}
               isCompleted={isModeDone("mongolianToEnglish", true, extraSession.words.length)}
@@ -176,10 +179,10 @@ export default function TodayScreen() {
 
       <View style={styles.newWordsSection}>
         <SecondaryButton onPress={handleRequestNewWords}>
-          Get 5 New Words
+          {t("today.getNewWords")}
         </SecondaryButton>
         <ThemedText style={[styles.newWordsHint, { color: colors.textSecondary }]}>
-          Practice more than your daily 5 words
+          {t("today.newWordsHint")}
         </ThemedText>
       </View>
     </ScrollView>

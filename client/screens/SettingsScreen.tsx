@@ -11,9 +11,11 @@ import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollV
 import { ThemedText } from "@/components/ThemedText";
 import { ThemeSegmentedControl } from "@/components/ThemeSegmentedControl";
 import { useTheme } from "@/hooks/useTheme";
+import { useLocalization } from "@/hooks/useLocalization";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
 import { resetTodayProgress, getOTAUpdatesEnabled, setOTAUpdatesEnabled } from "@/lib/storage";
+import { formatWordCount } from "@/lib/i18n";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -21,7 +23,8 @@ export default function SettingsScreen() {
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
 
-  const { themePreference, setThemePreference, refreshStreakData } = useApp();
+  const { themePreference, setThemePreference, refreshStreakData, mongolModeEnabled, setMongolModeEnabled } = useApp();
+  const { t, locale } = useLocalization();
   const [otaUpdatesEnabled, setOtaUpdatesEnabledState] = useState(false);
 
   useFocusEffect(
@@ -39,7 +42,7 @@ export default function SettingsScreen() {
     }, [])
   );
 
-  const themeOptions = ["Light", "Dark", "System"];
+  const themeOptions = [t("settings.light"), t("settings.dark"), t("settings.system")];
   const selectedThemeIndex = themePreference === "light" ? 0 : themePreference === "dark" ? 1 : 2;
 
   const handleThemeChange = async (index: number) => {
@@ -60,6 +63,11 @@ export default function SettingsScreen() {
     await setOTAUpdatesEnabled(value);
   };
 
+  const handleMongolModeToggle = async (value: boolean) => {
+    Haptics.selectionAsync();
+    await setMongolModeEnabled(value);
+  };
+
   const appVersion = Constants.expoConfig?.version ?? "1.0.0";
 
   return (
@@ -73,13 +81,13 @@ export default function SettingsScreen() {
       scrollIndicatorInsets={{ bottom: insets.bottom }}
     >
       <ThemedText style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-        Appearance
+        {t("settings.appearance")}
       </ThemedText>
 
       <View style={[styles.settingsCard, { backgroundColor: colors.backgroundDefault }]}>
         <View style={styles.themeSettingRow}>
           <ThemedText style={[styles.settingLabel, { color: colors.text }]}>
-            Theme
+            {t("settings.theme")}
           </ThemedText>
           <ThemeSegmentedControl
             values={themeOptions}
@@ -92,20 +100,40 @@ export default function SettingsScreen() {
             testID="theme-segmented-control"
           />
         </View>
+
+        <View style={[styles.divider, { backgroundColor: colors.backgroundSecondary }]} />
+
+        <View style={styles.settingRow}>
+          <View style={styles.settingLabelColumn}>
+            <ThemedText style={[styles.settingLabel, { color: colors.text }]}>
+              {t("settings.mongolMode")}
+            </ThemedText>
+            <ThemedText style={[styles.settingDescription, { color: colors.textSecondary }]}>
+              {t("settings.mongolModeDescription")}
+            </ThemedText>
+          </View>
+          <Switch
+            value={mongolModeEnabled}
+            onValueChange={handleMongolModeToggle}
+            trackColor={{ false: colors.primary + "40", true: colors.primary }}
+            thumbColor="#FFFFFF"
+            testID="mongol-mode-toggle"
+          />
+        </View>
       </View>
 
       <ThemedText style={[styles.sectionTitle, { color: colors.textSecondary, marginTop: Spacing["2xl"] }]}>
-        Dictionary
+        {t("settings.dictionary")}
       </ThemedText>
 
       <View style={[styles.settingsCard, { backgroundColor: colors.backgroundDefault }]}>
         <View style={styles.settingRow}>
           <View style={styles.settingLabelColumn}>
             <ThemedText style={[styles.settingLabel, { color: colors.text }]}>
-              Auto-download New Packs
+              {t("settings.autoDownload")}
             </ThemedText>
             <ThemedText style={[styles.settingDescription, { color: colors.textSecondary }]}>
-              Check for new word packs when online
+              {t("settings.autoDownloadDescription")}
             </ThemedText>
           </View>
           <Switch
@@ -119,7 +147,7 @@ export default function SettingsScreen() {
       </View>
 
       <ThemedText style={[styles.sectionTitle, { color: colors.textSecondary, marginTop: Spacing["2xl"] }]}>
-        Debug
+        {t("settings.debug")}
       </ThemedText>
 
       <View style={[styles.settingsCard, { backgroundColor: colors.backgroundDefault }]}>
@@ -129,20 +157,20 @@ export default function SettingsScreen() {
           testID="reset-today-button"
         >
           <ThemedText style={[styles.settingLabel, { color: colors.patternAccent }]}>
-            Reset Today's Progress
+            {t("settings.resetToday")}
           </ThemedText>
           <Feather name="refresh-cw" size={20} color={colors.patternAccent} />
         </Pressable>
       </View>
 
       <ThemedText style={[styles.sectionTitle, { color: colors.textSecondary, marginTop: Spacing["2xl"] }]}>
-        About
+        {t("settings.about")}
       </ThemedText>
 
       <View style={[styles.settingsCard, { backgroundColor: colors.backgroundDefault }]}>
         <View style={styles.settingRow}>
           <ThemedText style={[styles.settingLabel, { color: colors.text }]}>
-            Version
+            {t("settings.version")}
           </ThemedText>
           <ThemedText style={[styles.settingValue, { color: colors.textSecondary }]}>
             {appVersion}
@@ -153,20 +181,20 @@ export default function SettingsScreen() {
 
         <View style={styles.settingRow}>
           <ThemedText style={[styles.settingLabel, { color: colors.text }]}>
-            Dictionary Size
+            {t("settings.dictionarySize")}
           </ThemedText>
           <ThemedText style={[styles.settingValue, { color: colors.textSecondary }]}>
-            600 words
+            {formatWordCount(locale, 600)}
           </ThemedText>
         </View>
       </View>
 
       <View style={styles.footer}>
         <ThemedText style={[styles.footerText, { color: colors.textSecondary }]}>
-          Learn 5 new Mongolian words every day
+          {t("settings.footerTitle")}
         </ThemedText>
         <ThemedText style={[styles.footerSubtext, { color: colors.textSecondary }]}>
-          All data stored locally on your device
+          {t("settings.footerSubtext")}
         </ThemedText>
       </View>
     </KeyboardAwareScrollViewCompat>

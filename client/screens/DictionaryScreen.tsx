@@ -9,6 +9,7 @@ import * as Haptics from "expo-haptics";
 
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+import { useLocalization } from "@/hooks/useLocalization";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { dictionary as baseDictionary, Word } from "@/data/dictionary";
 import {
@@ -21,12 +22,7 @@ import {
 import { getAcceptedPackWords } from "@/lib/packWords";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { getPendingPackCount } from "@/lib/dictionaryUpdates";
-
-const CONFIDENCE_CONFIG = {
-  learning: { label: "Learning", color: "#E57373" },
-  familiar: { label: "Familiar", color: "#FFB74D" },
-  mastered: { label: "Mastered", color: "#81C784" },
-};
+import { getCategoryLabel } from "@/lib/i18n";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -37,11 +33,21 @@ export default function DictionaryScreen() {
   const colors = isDark ? Colors.dark : Colors.light;
   const navigation = useNavigation<NavigationProp>();
   const searchInputRef = useRef<TextInput>(null);
+  const { t, locale } = useLocalization();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [wordConfidence, setWordConfidence] = useState<WordConfidence>({});
   const [allWords, setAllWords] = useState<Word[]>(baseDictionary);
   const [pendingPackCount, setPendingPackCount] = useState(0);
+
+  const confidenceConfig = useMemo(
+    () => ({
+      learning: { label: t("confidence.learning"), color: "#E57373" },
+      familiar: { label: t("confidence.familiar"), color: "#FFB74D" },
+      mastered: { label: t("confidence.mastered"), color: "#81C784" },
+    }),
+    [t]
+  );
 
   const loadData = useCallback(async () => {
     const [confidence, userDict, deletedIds, packWords] = await Promise.all([
@@ -116,6 +122,8 @@ export default function DictionaryScreen() {
       word={item}
       colors={colors}
       confidenceLevel={wordConfidence[item.id] ?? null}
+      confidenceConfig={confidenceConfig}
+      locale={locale}
       onPress={() => handleWordPress(item)}
     />
   );
@@ -128,10 +136,10 @@ export default function DictionaryScreen() {
         resizeMode="contain"
       />
       <ThemedText style={[styles.emptyTitle, { color: colors.text }]}>
-        No words found
+        {t("dictionary.noWords")}
       </ThemedText>
       <ThemedText style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-        Try a different search term
+        {t("dictionary.tryDifferent")}
       </ThemedText>
     </View>
   );
@@ -141,7 +149,7 @@ export default function DictionaryScreen() {
       <View style={[styles.headerContainer, { paddingTop: insets.top + Spacing.lg }]}>
         <View style={styles.headerRow}>
           <ThemedText style={[styles.headerTitle, { color: colors.text }]}>
-            Dictionary
+            {t("navigation.dictionary")}
           </ThemedText>
 
           <View style={styles.headerActions}>
@@ -179,7 +187,7 @@ export default function DictionaryScreen() {
           <TextInput
             ref={searchInputRef}
             style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Search words..."
+            placeholder={t("dictionary.searchPlaceholder")}
             placeholderTextColor={colors.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -206,7 +214,7 @@ export default function DictionaryScreen() {
             >
               <Feather name="chevron-down" size={20} color={colors.primary} />
               <ThemedText style={[styles.accessoryButtonText, { color: colors.primary }]}>
-                Done
+                {t("common.done")}
               </ThemedText>
             </Pressable>
           </View>
@@ -235,10 +243,16 @@ interface WordRowProps {
   word: Word;
   colors: typeof Colors.light;
   confidenceLevel: ConfidenceLevel | null;
+  confidenceConfig: {
+    learning: { label: string; color: string };
+    familiar: { label: string; color: string };
+    mastered: { label: string; color: string };
+  };
+  locale: "en" | "mn";
   onPress: () => void;
 }
 
-function WordRow({ word, colors, confidenceLevel, onPress }: WordRowProps) {
+function WordRow({ word, colors, confidenceLevel, confidenceConfig, locale, onPress }: WordRowProps) {
   return (
     <Pressable
       style={({ pressed }) => [
@@ -257,22 +271,22 @@ function WordRow({ word, colors, confidenceLevel, onPress }: WordRowProps) {
             <View
               style={[
                 styles.confidenceBadge,
-                { backgroundColor: CONFIDENCE_CONFIG[confidenceLevel].color + "20" },
+                { backgroundColor: confidenceConfig[confidenceLevel].color + "20" },
               ]}
             >
               <View
                 style={[
                   styles.confidenceDot,
-                  { backgroundColor: CONFIDENCE_CONFIG[confidenceLevel].color },
+                  { backgroundColor: confidenceConfig[confidenceLevel].color },
                 ]}
               />
               <ThemedText
                 style={[
                   styles.confidenceText,
-                  { color: CONFIDENCE_CONFIG[confidenceLevel].color },
+                  { color: confidenceConfig[confidenceLevel].color },
                 ]}
               >
-                {CONFIDENCE_CONFIG[confidenceLevel].label}
+                {confidenceConfig[confidenceLevel].label}
               </ThemedText>
             </View>
           ) : null}
@@ -291,7 +305,7 @@ function WordRow({ word, colors, confidenceLevel, onPress }: WordRowProps) {
       <View style={styles.rightContent}>
         <View style={[styles.categoryBadge, { backgroundColor: colors.backgroundSecondary }]}>
           <ThemedText style={[styles.categoryText, { color: colors.textSecondary }]}>
-            {word.category}
+            {getCategoryLabel(locale, word.category)}
           </ThemedText>
         </View>
         <Feather name="chevron-right" size={18} color={colors.textSecondary} />

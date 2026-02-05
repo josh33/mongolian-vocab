@@ -13,6 +13,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing } from "@/constants/theme";
 import { HeaderTitle } from "@/components/HeaderTitle";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
+import { useLocalization } from "@/hooks/useLocalization";
 import { StreakBadge } from "@/components/StreakBadge";
 import { useApp } from "@/context/AppContext";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
@@ -42,6 +43,7 @@ export default function MainTabNavigator() {
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
   const screenOptions = useScreenOptions();
+  const { t } = useLocalization();
 
   return (
     <Tab.Navigator
@@ -73,8 +75,8 @@ export default function MainTabNavigator() {
         name="TodayTab"
         component={TodayScreen}
         options={{
-          title: "Today",
-          headerTitle: () => <HeaderTitle title="Mongolian Vocab" />,
+          title: t("navigation.today"),
+          headerTitle: () => <HeaderTitle title={t("navigation.appTitle")} />,
           headerRight: () => <StreakHeaderButton />,
           headerRightContainerStyle: { paddingRight: Spacing.lg },
           tabBarIcon: ({ color, size }) => (
@@ -86,7 +88,7 @@ export default function MainTabNavigator() {
         name="DictionaryTab"
         component={DictionaryScreen}
         options={{
-          title: "Dictionary",
+          title: t("navigation.dictionary"),
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Feather name="book" size={size} color={color} />
@@ -97,7 +99,7 @@ export default function MainTabNavigator() {
         name="SettingsTab"
         component={SettingsScreen}
         options={{
-          title: "Settings",
+          title: t("navigation.settings"),
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Feather name="settings" size={size} color={color} />

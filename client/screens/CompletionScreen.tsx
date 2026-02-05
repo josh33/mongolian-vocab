@@ -14,9 +14,11 @@ import * as Haptics from "expo-haptics";
 import { Button } from "@/components/Button";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+import { useLocalization } from "@/hooks/useLocalization";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
+import { formatDayStreak, getModeLabel } from "@/lib/i18n";
 
 import horseArcherImage from "../../assets/images/horse-archer.png";
 
@@ -30,6 +32,7 @@ export default function CompletionScreen() {
   const { mode, isExtra } = route.params;
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
+  const { t, locale } = useLocalization();
 
   const { isBothModesCompleted, lastStreakUpdate, clearLastStreakUpdate, streakData } = useApp();
   const bothCompleted = isBothModesCompleted(isExtra);
@@ -71,9 +74,7 @@ export default function CompletionScreen() {
   };
 
   const modeLabel =
-    mode === "englishToMongolian"
-      ? "English → Mongolian"
-      : "Mongolian → English";
+    getModeLabel(locale, mode);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.backgroundRoot }]}>
@@ -92,14 +93,14 @@ export default function CompletionScreen() {
 
         <Animated.View style={[styles.textContainer, textStyle]}>
           <ThemedText style={[styles.title, { color: colors.text }]}>
-            {bothCompleted ? "All Done!" : "Mode Complete!"}
+            {bothCompleted ? t("completion.allDone") : t("completion.modeComplete")}
           </ThemedText>
           <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>
             {bothCompleted
               ? isExtra
-                ? "You've finished your extra practice. Amazing dedication!"
-                : "You've completed both modes for today. Outstanding work!"
-              : `You've finished ${modeLabel}. Keep going!`}
+                ? t("completion.extraDone")
+                : t("completion.bothDone")
+              : t("completion.finishedMode", { mode: modeLabel })}
           </ThemedText>
 
           {showStreakUpdate ? (
@@ -111,14 +112,16 @@ export default function CompletionScreen() {
               />
               <View style={styles.streakTextContainer}>
                 <ThemedText style={[styles.streakTitle, { color: colors.secondary }]}>
-                  {lastStreakUpdate.usedFreeze ? "Streak Saved!" : `${streakData.currentStreak} Day Streak!`}
+                  {lastStreakUpdate.usedFreeze
+                    ? t("completion.streakSaved")
+                    : formatDayStreak(locale, streakData.currentStreak)}
                 </ThemedText>
                 <ThemedText style={[styles.streakSubtitle, { color: colors.textSecondary }]}>
                   {lastStreakUpdate.usedFreeze 
-                    ? "You used your streak freeze" 
+                    ? t("completion.usedFreeze") 
                     : lastStreakUpdate.streakBroken 
-                      ? "Starting a new streak!" 
-                      : "Keep the momentum going!"}
+                      ? t("completion.startingNew") 
+                      : t("completion.keepMomentum")}
                 </ThemedText>
               </View>
             </Animated.View>
@@ -128,7 +131,7 @@ export default function CompletionScreen() {
 
       <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + Spacing.xl }]}>
         <Button onPress={handleContinue} style={styles.button}>
-          Continue
+          {t("completion.continue")}
         </Button>
       </View>
     </View>

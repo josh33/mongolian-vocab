@@ -15,6 +15,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ConfidenceIndicator } from "@/components/ConfidenceIndicator";
 import { ConfidenceButtons } from "@/components/ConfidenceButtons";
 import { useTheme } from "@/hooks/useTheme";
+import { useLocalization } from "@/hooks/useLocalization";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { Word } from "@/data/dictionary";
 import { PracticeMode } from "@/context/AppContext";
@@ -47,6 +48,7 @@ export function FlashCard({
 }: FlashCardProps) {
   const { theme, isDark } = useTheme();
   const rotation = useSharedValue(isFlipped ? 180 : 0);
+  const { t } = useLocalization();
 
   useEffect(() => {
     rotation.value = withTiming(isFlipped ? 180 : 0, { duration: 400 });
@@ -88,9 +90,9 @@ export function FlashCard({
   });
 
   const frontWord = mode === "englishToMongolian" ? word.english : word.mongolian;
-  const frontLabel = mode === "englishToMongolian" ? "English" : "Mongolian";
+  const frontLabel = mode === "englishToMongolian" ? t("common.english") : t("common.mongolian");
   const backWord = mode === "englishToMongolian" ? word.mongolian : word.english;
-  const backLabel = mode === "englishToMongolian" ? "Mongolian" : "English";
+  const backLabel = mode === "englishToMongolian" ? t("common.mongolian") : t("common.english");
   const pronunciation = null;
 
   const colors = isDark ? Colors.dark : Colors.light;
@@ -132,7 +134,7 @@ export function FlashCard({
           </ThemedText>
         </View>
         <ThemedText style={[styles.tapHint, { color: colors.textSecondary }]}>
-          Tap to reveal
+          {t("practice.tapToReveal")}
         </ThemedText>
       </Animated.View>
 

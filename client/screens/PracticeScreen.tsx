@@ -9,10 +9,12 @@ import { FlashCard } from "@/components/FlashCard";
 import { ProgressDots } from "@/components/ProgressDots";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+import { useLocalization } from "@/hooks/useLocalization";
 import { Colors, Spacing } from "@/constants/theme";
 import { useApp, PracticeMode } from "@/context/AppContext";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { Word } from "@/data/dictionary";
+import { getModeLabel } from "@/lib/i18n";
 import { 
   ConfidenceLevel, 
   WordConfidence, 
@@ -31,6 +33,7 @@ export default function PracticeScreen() {
   const { mode, isExtra } = route.params;
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
+  const { t, locale } = useLocalization();
 
   const {
     getWordsForMode,
@@ -139,10 +142,7 @@ export default function PracticeScreen() {
   ]);
 
   const currentWord = words[currentIndex];
-  const modeTitle =
-    mode === "englishToMongolian"
-      ? "English → Mongolian"
-      : "Mongolian → English";
+  const modeTitle = getModeLabel(locale, mode);
   
   const currentConfidence = currentWord 
     ? wordConfidence[currentWord.id] || null 
@@ -172,7 +172,7 @@ export default function PracticeScreen() {
           hitSlop={16}
         >
           <ThemedText style={[styles.closeText, { color: colors.text }]}>
-            Close
+            {t("common.close")}
           </ThemedText>
         </Pressable>
         <ThemedText style={[styles.modeTitle, { color: colors.text }]}>

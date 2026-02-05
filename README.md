@@ -14,6 +14,7 @@ The app is intentionally minimal: no accounts, no tracking, no ads. All vocabula
 - 📊 Track confidence per word (learning / familiar / mastered)
 - 🧊 Streaks with weekly streak freeze mechanic
 - 🌙 Light and dark mode support
+- 🇲🇳 “Монгол Mode” toggle to display app labels in Mongolian
 - 🔒 Fully offline — no network required (optional OTA updates for new packs)
 
 ---

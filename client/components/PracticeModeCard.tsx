@@ -10,6 +10,8 @@ import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { useTheme } from "@/hooks/useTheme";
+import { useLocalization } from "@/hooks/useLocalization";
+import { formatCompleted } from "@/lib/i18n";
 
 interface PracticeModeCardProps {
   title: string;
@@ -35,6 +37,7 @@ export function PracticeModeCard({
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
   const scale = useSharedValue(1);
+  const { locale } = useLocalization();
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -99,7 +102,7 @@ export function PracticeModeCard({
           />
         </View>
         <ThemedText style={[styles.progressText, { color: colors.textSecondary }]}>
-          {progress}/{total} completed
+          {formatCompleted(locale, progress, total)}
         </ThemedText>
       </View>
     </AnimatedPressable>

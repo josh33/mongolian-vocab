@@ -2,6 +2,7 @@ import React from "react";
 import { StyleSheet, View, Modal, Pressable } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
+import { useLocalization } from "@/hooks/useLocalization";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 
 interface ConfirmModalProps {
@@ -19,14 +20,17 @@ export function ConfirmModal({
   visible,
   title,
   message,
-  confirmText = "Confirm",
-  cancelText = "Cancel",
+  confirmText,
+  cancelText,
   isDestructive = false,
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
+  const { t } = useLocalization();
+  const resolvedConfirmText = confirmText ?? t("common.confirm");
+  const resolvedCancelText = cancelText ?? t("common.cancel");
 
   return (
     <Modal
@@ -44,7 +48,7 @@ export function ConfirmModal({
             {message}
           </ThemedText>
           <View style={styles.buttons}>
-            {cancelText ? (
+            {resolvedCancelText ? (
               <Pressable
                 style={[
                   styles.button,
@@ -55,7 +59,7 @@ export function ConfirmModal({
                 testID="confirm-modal-cancel"
               >
                 <ThemedText style={[styles.buttonText, { color: colors.text }]}>
-                  {cancelText}
+                  {resolvedCancelText}
                 </ThemedText>
               </Pressable>
             ) : null}
@@ -69,7 +73,7 @@ export function ConfirmModal({
               testID="confirm-modal-confirm"
             >
               <ThemedText style={[styles.buttonText, { color: "#FFFFFF" }]}>
-                {confirmText}
+                {resolvedConfirmText}
               </ThemedText>
             </Pressable>
           </View>

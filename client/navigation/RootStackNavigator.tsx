@@ -7,6 +7,7 @@ import EditWordScreen from "@/screens/EditWordScreen";
 import DictionaryUpdatesScreen from "@/screens/DictionaryUpdatesScreen";
 import StreakScreen from "@/screens/StreakScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
+import { useLocalization } from "@/hooks/useLocalization";
 import { PracticeMode } from "@/context/AppContext";
 import { Word } from "@/data/dictionary";
 
@@ -23,6 +24,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootStackNavigator() {
   const screenOptions = useScreenOptions();
+  const { t } = useLocalization();
 
   return (
     <Stack.Navigator screenOptions={screenOptions}>
@@ -53,14 +55,14 @@ export default function RootStackNavigator() {
         name="EditWord"
         component={EditWordScreen}
         options={({ route }) => ({
-          headerTitle: route.params.isNew ? "Add Word" : "Edit Word",
+          headerTitle: route.params.isNew ? t("navigation.addWord") : t("navigation.editWord"),
         })}
       />
       <Stack.Screen
         name="DictionaryUpdates"
         component={DictionaryUpdatesScreen}
         options={{
-          headerTitle: "Dictionary Updates",
+          headerTitle: t("navigation.dictionaryUpdates"),
         }}
       />
       <Stack.Screen

@@ -18,6 +18,7 @@ import {
   getWordConfidence,
   getUserDictionary,
   getDeletedWordIds,
+  getWordOverrides,
 } from "@/lib/storage";
 import { getAcceptedPackWords } from "@/lib/packWords";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
@@ -50,22 +51,25 @@ export default function DictionaryScreen() {
   );
 
   const loadData = useCallback(async () => {
-    const [confidence, userDict, deletedIds, packWords] = await Promise.all([
+    const [confidence, userDict, deletedIds, packWords, overrides] = await Promise.all([
       getWordConfidence(),
       getUserDictionary(),
       getDeletedWordIds(),
       getAcceptedPackWords(),
+      getWordOverrides(),
     ]);
 
     setWordConfidence(confidence);
 
+    const applyOverride = (word: Word) => overrides[word.id] ?? word;
+
     const baseWords = baseDictionary
       .filter((w) => !deletedIds.includes(w.id))
-      .map((w) => userDict.editedWords[w.id] ?? w);
+      .map(applyOverride);
 
     const packWordsMerged = packWords
       .filter((w) => !deletedIds.includes(w.id))
-      .map((w) => userDict.editedWords[w.id] ?? w);
+      .map(applyOverride);
 
     const combined = [...baseWords, ...packWordsMerged, ...userDict.words];
     setAllWords(combined);

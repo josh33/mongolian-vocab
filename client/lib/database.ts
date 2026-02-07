@@ -44,6 +44,15 @@ async function initializeTables(database: SQLite.SQLiteDatabase): Promise<void> 
       level TEXT NOT NULL DEFAULT 'learning'
     );
 
+    CREATE TABLE IF NOT EXISTS word_overrides (
+      word_id INTEGER PRIMARY KEY,
+      english TEXT NOT NULL,
+      mongolian TEXT NOT NULL,
+      pronunciation TEXT,
+      category TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS user_dictionary (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       english TEXT NOT NULL,
@@ -131,6 +140,14 @@ export interface StreakHistoryRow {
 export interface WordConfidenceRow {
   word_id: number;
   level: string;
+}
+
+export interface WordOverrideRow {
+  word_id: number;
+  english: string;
+  mongolian: string;
+  pronunciation: string | null;
+  category: string;
 }
 
 export interface UserDictionaryRow {
@@ -259,6 +276,62 @@ export async function saveWordConfidenceToDB(wordId: number, level: string): Pro
   );
 }
 
+export async function deleteWordConfidenceFromDB(wordId: number): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync("DELETE FROM word_confidence WHERE word_id = ?", [wordId]);
+}
+
+export async function getWordOverridesFromDB(): Promise<Record<number, WordOverrideRow>> {
+  const database = await getDatabase();
+  const rows = await database.getAllAsync<WordOverrideRow>(
+    "SELECT word_id, english, mongolian, pronunciation, category FROM word_overrides"
+  );
+  const result: Record<number, WordOverrideRow> = {};
+  for (const row of rows) {
+    result[row.word_id] = row;
+  }
+  return result;
+}
+
+export async function getWordOverrideFromDB(wordId: number): Promise<WordOverrideRow | null> {
+  const database = await getDatabase();
+  const row = await database.getFirstAsync<WordOverrideRow>(
+    "SELECT word_id, english, mongolian, pronunciation, category FROM word_overrides WHERE word_id = ?",
+    [wordId]
+  );
+  return row ?? null;
+}
+
+export async function saveWordOverrideToDB(word: {
+  id: number;
+  english: string;
+  mongolian: string;
+  pronunciation?: string;
+  category: string;
+}): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    `INSERT OR REPLACE INTO word_overrides (word_id, english, mongolian, pronunciation, category, updated_at)
+     VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+    [word.id, word.english, word.mongolian, word.pronunciation ?? null, word.category]
+  );
+}
+
+export async function deleteWordOverrideFromDB(wordId: number): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync("DELETE FROM word_overrides WHERE word_id = ?", [wordId]);
+}
+
+export async function deleteWordOverridesByIds(wordIds: number[]): Promise<void> {
+  if (wordIds.length === 0) return;
+  const database = await getDatabase();
+  const placeholders = wordIds.map(() => "?").join(", ");
+  await database.runAsync(
+    `DELETE FROM word_overrides WHERE word_id IN (${placeholders})`,
+    wordIds
+  );
+}
+
 export async function getUserDictionaryFromDB(): Promise<UserDictionaryRow[]> {
   const database = await getDatabase();
   return database.getAllAsync<UserDictionaryRow>(
@@ -280,6 +353,21 @@ export async function addWordToDictionaryDB(word: {
   return result.lastInsertRowId;
 }
 
+export async function updateWordInDictionaryDB(word: {
+  id: number;
+  english: string;
+  mongolian: string;
+  pronunciation?: string;
+  category?: string;
+}): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    `UPDATE user_dictionary
+     SET english = ?, mongolian = ?, pronunciation = ?, category = ?
+     WHERE id = ?`,
+    [word.english, word.mongolian, word.pronunciation ?? null, word.category ?? "custom", word.id]
+  );
+}
 export async function removeWordFromDictionaryDB(id: number): Promise<void> {
   const database = await getDatabase();
   await database.runAsync("DELETE FROM user_dictionary WHERE id = ?", [id]);
@@ -298,6 +386,16 @@ export async function addDeletedWordDB(wordId: number): Promise<void> {
   await database.runAsync(
     "INSERT OR IGNORE INTO deleted_words (word_id) VALUES (?)",
     [wordId]
+  );
+}
+
+export async function deleteDeletedWordsByIds(wordIds: number[]): Promise<void> {
+  if (wordIds.length === 0) return;
+  const database = await getDatabase();
+  const placeholders = wordIds.map(() => "?").join(", ");
+  await database.runAsync(
+    `DELETE FROM deleted_words WHERE word_id IN (${placeholders})`,
+    wordIds
   );
 }
 

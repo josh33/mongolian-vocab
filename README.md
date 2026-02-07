@@ -11,6 +11,7 @@ The app is intentionally minimal: no accounts, no tracking, no ads. All vocabula
 - 📖 Built-in Mongolian ↔ English dictionary (base list + optional packs + custom words)
 - 🧠 Daily vocabulary practice (two modes: English → Mongolian, Mongolian → English)
 - ✍️ Add, edit, or delete custom words
+- ✍️ Edit any word (including pack words), with source shown on the edit screen
 - 📊 Track confidence per word (learning / familiar / mastered)
 - 🧊 Streaks with weekly streak freeze mechanic
 - 🌙 Light and dark mode support
@@ -60,6 +61,7 @@ This app is fully offline. All data lives on-device.
 ## Dictionary Packs & OTA Updates
 
 - Packs are versioned and can be previewed, added, dismissed, or upgraded.
+- Pack upgrades support **New Words Only** or **Reset Pack** (restores deleted pack words and discards edits for that pack).
 - OTA updates (via `expo-updates`) deliver new pack data when enabled.
 - The “Auto-download New Packs” toggle controls OTA update checks.
 

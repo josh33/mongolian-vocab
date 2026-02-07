@@ -1,16 +1,25 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Word } from "@/data/dictionary";
+import { Word, dictionary } from "@/data/dictionary";
+import { PACKS, getPackWords } from "@/data/packs";
 import {
   getDatabase,
   getStreakDataFromDB,
   saveStreakDataToDB,
   getWordConfidenceFromDB,
   saveWordConfidenceToDB,
+  deleteWordConfidenceFromDB,
+  getWordOverridesFromDB,
+  getWordOverrideFromDB,
+  saveWordOverrideToDB,
+  deleteWordOverrideFromDB,
+  deleteWordOverridesByIds,
   getUserDictionaryFromDB,
   addWordToDictionaryDB,
+  updateWordInDictionaryDB,
   removeWordFromDictionaryDB,
   getDeletedWordIdsFromDB,
   addDeletedWordDB,
+  deleteDeletedWordsByIds,
   getPackStatusFromDB,
   setPackStatusDB,
   getDailyProgressFromDB,
@@ -46,6 +55,10 @@ export interface WordConfidence {
   [wordId: number]: ConfidenceLevel;
 }
 
+export interface WordOverrideMap {
+  [wordId: number]: Word;
+}
+
 export interface DailyProgress {
   date: string;
   englishToMongolianCompleted: boolean;
@@ -76,6 +89,14 @@ function getDateString(date: Date): string {
 function parseDateStringLocal(dateString: string): Date {
   const [year, month, day] = dateString.split("-").map(Number);
   return new Date(year, month - 1, day);
+}
+
+function isCustomWordId(wordId: number): boolean {
+  return wordId >= 1000 && wordId < 100000;
+}
+
+function isBundleWordId(wordId: number): boolean {
+  return wordId >= 100000 && wordId < 200000;
 }
 
 export async function initializeStorage(): Promise<void> {
@@ -336,6 +357,107 @@ export async function saveWordConfidence(confidence: WordConfidence): Promise<vo
   }
 }
 
+export async function deleteWordConfidenceLevel(wordId: number): Promise<void> {
+  try {
+    if (!isNativePlatform()) {
+      const current = await getWordConfidence();
+      if (current[wordId]) {
+        delete current[wordId];
+        await saveWordConfidence(current);
+      }
+      return;
+    }
+    await deleteWordConfidenceFromDB(wordId);
+  } catch (error) {
+    console.error("Failed to delete word confidence:", error);
+  }
+}
+
+export async function getWordOverrides(): Promise<WordOverrideMap> {
+  try {
+    if (!isNativePlatform()) {
+      const dict = await getUserDictionary();
+      return dict.editedWords ?? {};
+    }
+    const rows = await getWordOverridesFromDB();
+    const result: WordOverrideMap = {};
+    for (const [wordId, row] of Object.entries(rows)) {
+      const id = parseInt(wordId, 10);
+      result[id] = {
+        id,
+        english: row.english,
+        mongolian: row.mongolian,
+        pronunciation: row.pronunciation ?? "",
+        category: row.category,
+      };
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+export async function getWordOverride(wordId: number): Promise<Word | null> {
+  try {
+    if (!isNativePlatform()) {
+      const dict = await getUserDictionary();
+      return dict.editedWords[wordId] ?? null;
+    }
+    const row = await getWordOverrideFromDB(wordId);
+    if (!row) return null;
+    return {
+      id: row.word_id,
+      english: row.english,
+      mongolian: row.mongolian,
+      pronunciation: row.pronunciation ?? "",
+      category: row.category,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function saveWordOverride(word: Word): Promise<void> {
+  if (!isNativePlatform()) {
+    const dict = await getUserDictionary();
+    dict.editedWords[word.id] = word;
+    await saveUserDictionary(dict);
+    return;
+  }
+  await saveWordOverrideToDB(word);
+}
+
+export async function removeWordOverride(wordId: number): Promise<void> {
+  if (!isNativePlatform()) {
+    const dict = await getUserDictionary();
+    if (dict.editedWords[wordId]) {
+      delete dict.editedWords[wordId];
+      await saveUserDictionary(dict);
+    }
+    return;
+  }
+  await deleteWordOverrideFromDB(wordId);
+}
+
+export async function removeWordOverridesByIds(wordIds: number[]): Promise<void> {
+  if (wordIds.length === 0) return;
+  if (!isNativePlatform()) {
+    const dict = await getUserDictionary();
+    let changed = false;
+    for (const id of wordIds) {
+      if (dict.editedWords[id]) {
+        delete dict.editedWords[id];
+        changed = true;
+      }
+    }
+    if (changed) {
+      await saveUserDictionary(dict);
+    }
+    return;
+  }
+  await deleteWordOverridesByIds(wordIds);
+}
+
 export async function updateWordConfidenceLevel(
   wordId: number,
   level: ConfidenceLevel
@@ -435,6 +557,21 @@ export async function saveDeletedWordIds(ids: number[]): Promise<void> {
   }
 }
 
+export async function removeDeletedWordIds(ids: number[]): Promise<void> {
+  if (ids.length === 0) return;
+  try {
+    if (!isNativePlatform()) {
+      const existing = await getDeletedWordIds();
+      const filtered = existing.filter(id => !ids.includes(id));
+      await AsyncStorage.setItem(STORAGE_KEYS.DELETED_WORD_IDS, JSON.stringify(filtered));
+      return;
+    }
+    await deleteDeletedWordsByIds(ids);
+  } catch (error) {
+    console.error("Failed to remove deleted word IDs:", error);
+  }
+}
+
 export async function addWord(word: Omit<Word, "id">): Promise<Word> {
   if (!isNativePlatform()) {
     const dict = await getUserDictionary();
@@ -474,18 +611,20 @@ export async function updateWord(word: Word): Promise<void> {
     await saveUserDictionary(dict);
     return;
   }
-
   const existingWord = dict.words.find(w => w.id === word.id);
-  if (existingWord) {
+  if (existingWord && isCustomWordId(word.id)) {
     const dbId = word.id - 1000;
-    await removeWordFromDictionaryDB(dbId);
-    await addWordToDictionaryDB({
+    await updateWordInDictionaryDB({
+      id: dbId,
       english: word.english,
       mongolian: word.mongolian,
       pronunciation: word.pronunciation,
       category: word.category,
     });
+    return;
   }
+
+  await saveWordOverride(word);
 }
 
 export async function getUpdatedWord(wordId: number, baseWord: Word): Promise<Word> {
@@ -494,7 +633,50 @@ export async function getUpdatedWord(wordId: number, baseWord: Word): Promise<Wo
   if (userWord) {
     return userWord;
   }
-  return baseWord;
+  if (!isNativePlatform()) {
+    const edited = dict.editedWords[wordId];
+    return edited ?? baseWord;
+  }
+  const override = await getWordOverride(wordId);
+  return override ?? baseWord;
+}
+
+export type WordSourceInfo =
+  | { type: "custom" }
+  | { type: "pack"; packId: string; packTitle: string; packVersion: number }
+  | { type: "base" }
+  | { type: "bundle" }
+  | { type: "unknown" };
+
+export async function getWordSourceInfo(wordId: number): Promise<WordSourceInfo> {
+  const dict = await getUserDictionary();
+  if (dict.words.some(w => w.id === wordId) || isCustomWordId(wordId)) {
+    return { type: "custom" };
+  }
+
+  const accepted = await getAcceptedPacks();
+  for (const pack of accepted) {
+    const words = getPackWords(pack.id, pack.version);
+    if (words.some(w => w.id === wordId)) {
+      const meta = PACKS.find(p => p.id === pack.id);
+      return {
+        type: "pack",
+        packId: pack.id,
+        packTitle: meta?.title ?? pack.id,
+        packVersion: pack.version,
+      };
+    }
+  }
+
+  if (dictionary.some(w => w.id === wordId)) {
+    return { type: "base" };
+  }
+
+  if (isBundleWordId(wordId)) {
+    return { type: "bundle" };
+  }
+
+  return { type: "unknown" };
 }
 
 export async function deleteWord(wordId: number): Promise<void> {
@@ -511,6 +693,10 @@ export async function deleteWord(wordId: number): Promise<void> {
         deletedIds.push(wordId);
         await saveDeletedWordIds(deletedIds);
       }
+    }
+    if (dict.editedWords[wordId]) {
+      delete dict.editedWords[wordId];
+      await saveUserDictionary(dict);
     }
     const confidence = await getWordConfidence();
     if (confidence[wordId]) {
@@ -529,10 +715,9 @@ export async function deleteWord(wordId: number): Promise<void> {
     await addDeletedWordDB(wordId);
   }
   
-  const confidence = await getWordConfidence();
-  if (confidence[wordId]) {
-    delete confidence[wordId];
-  }
+  await removeWordOverride(wordId);
+  
+  await deleteWordConfidenceLevel(wordId);
 }
 
 export type BundleStateMap = Record<string, number>;
@@ -1009,6 +1194,142 @@ export async function saveAcceptedPacks(packs: AcceptedPack[]): Promise<void> {
   } catch (error) {
     console.error("Failed to save accepted packs:", error);
   }
+}
+
+function getPackWordMap(packId: string, version: number): Record<number, Word> {
+  const words = getPackWords(packId, version);
+  const map: Record<number, Word> = {};
+  for (const w of words) {
+    map[w.id] = w;
+  }
+  return map;
+}
+
+function getWordDiffIds(oldMap: Record<number, Word>, newMap: Record<number, Word>): {
+  removed: number[];
+  changed: number[];
+} {
+  const removed: number[] = [];
+  const changed: number[] = [];
+  for (const [idStr, oldWord] of Object.entries(oldMap)) {
+    const id = parseInt(idStr, 10);
+    const newWord = newMap[id];
+    if (!newWord) {
+      removed.push(id);
+      continue;
+    }
+    if (
+      oldWord.english !== newWord.english ||
+      oldWord.mongolian !== newWord.mongolian ||
+      oldWord.pronunciation !== newWord.pronunciation ||
+      oldWord.category !== newWord.category
+    ) {
+      changed.push(id);
+    }
+  }
+  return { removed, changed };
+}
+
+async function transferConfidence(oldId: number, newId: number): Promise<void> {
+  const confidence = await getWordConfidence();
+  const level = confidence[oldId];
+  if (!level) return;
+  if (!isNativePlatform()) {
+    delete confidence[oldId];
+    confidence[newId] = level;
+    await saveWordConfidence(confidence);
+    return;
+  }
+  await deleteWordConfidenceLevel(oldId);
+  await saveWordConfidenceToDB(newId, level);
+}
+
+export async function getPackModificationSummary(packId: string, version: number): Promise<{
+  hasEdits: boolean;
+  hasDeletions: boolean;
+}> {
+  const [overrides, deleted] = await Promise.all([
+    getWordOverrides(),
+    getDeletedWordIds(),
+  ]);
+  const packWords = getPackWords(packId, version);
+  const ids = new Set(packWords.map(w => w.id));
+  let hasEdits = false;
+  let hasDeletions = false;
+
+  for (const id of ids) {
+    if (!hasEdits && overrides[id]) hasEdits = true;
+    if (!hasDeletions && deleted.includes(id)) hasDeletions = true;
+    if (hasEdits && hasDeletions) break;
+  }
+
+  return { hasEdits, hasDeletions };
+}
+
+export type PackUpgradeMode = "reset" | "new_words";
+
+export async function upgradePack(
+  packId: string,
+  newVersion: number,
+  mode: PackUpgradeMode
+): Promise<{
+  addedCustom: number;
+  removedOverrides: number;
+  restoredDeletes: number;
+  resetConfidences: number;
+}> {
+  const accepted = await getAcceptedPacks();
+  const current = accepted.find(p => p.id === packId);
+  const oldVersion = current?.version ?? newVersion;
+
+  const oldMap = getPackWordMap(packId, oldVersion);
+  const newMap = getPackWordMap(packId, newVersion);
+  const { removed, changed } = getWordDiffIds(oldMap, newMap);
+
+  const overrides = await getWordOverrides();
+  let addedCustom = 0;
+  let removedOverrides = 0;
+  let restoredDeletes = 0;
+  let resetConfidences = 0;
+  const removedOverrideIds = new Set<number>();
+
+  for (const id of removed) {
+    const override = overrides[id];
+    if (override) {
+      const newWord = await addWord({
+        english: override.english,
+        mongolian: override.mongolian,
+        pronunciation: override.pronunciation,
+        category: override.category,
+      });
+      await transferConfidence(id, newWord.id);
+      await removeWordOverride(id);
+      removedOverrideIds.add(id);
+      removedOverrides += 1;
+      addedCustom += 1;
+    }
+  }
+
+  if (mode === "reset") {
+    const oldIds = Object.keys(oldMap).map(id => parseInt(id, 10));
+    const overrideIds = oldIds.filter(id => overrides[id] && !removedOverrideIds.has(id));
+    await removeWordOverridesByIds(overrideIds);
+    removedOverrides += overrideIds.length;
+
+    const deletedIds = await getDeletedWordIds();
+    const restoreIds = oldIds.filter(id => deletedIds.includes(id));
+    await removeDeletedWordIds(restoreIds);
+    restoredDeletes = restoreIds.length;
+
+    for (const id of changed) {
+      await deleteWordConfidenceLevel(id);
+      resetConfidences += 1;
+    }
+  }
+
+  await acceptPack(packId, newVersion);
+
+  return { addedCustom, removedOverrides, restoredDeletes, resetConfidences };
 }
 
 export async function acceptPack(packId: string, version: number): Promise<void> {

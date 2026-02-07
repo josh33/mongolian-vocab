@@ -24,6 +24,8 @@ import {
   updateWord,
   addWord,
   deleteWord,
+  getWordSourceInfo,
+  WordSourceInfo,
 } from "@/lib/storage";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { useApp } from "@/context/AppContext";
@@ -74,12 +76,14 @@ export default function EditWordScreen({ navigation, route }: Props) {
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showValidationModal, setShowValidationModal] = useState(false);
+  const [sourceInfo, setSourceInfo] = useState<WordSourceInfo | null>(null);
 
   useEffect(() => {
     if (word) {
       getWordConfidence().then((confidence) => {
         setConfidenceLevel(confidence[word.id] ?? null);
       });
+      getWordSourceInfo(word.id).then(setSourceInfo);
     }
   }, [word]);
 
@@ -179,6 +183,28 @@ export default function EditWordScreen({ navigation, route }: Props) {
                 {confidenceConfig[confidenceLevel].label}
               </ThemedText>
             </View>
+          </View>
+        ) : null}
+
+        {!isNew && sourceInfo ? (
+          <View style={styles.sourceSection}>
+            <ThemedText style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+              {t("editWord.sourceLabel")}
+            </ThemedText>
+            <ThemedText style={[styles.sourceValue, { color: colors.text }]}>
+              {sourceInfo.type === "pack"
+                ? t("editWord.sourcePack", {
+                    pack: sourceInfo.packTitle,
+                    version: sourceInfo.packVersion,
+                  })
+                : sourceInfo.type === "base"
+                ? t("editWord.sourceBase")
+                : sourceInfo.type === "custom"
+                ? t("editWord.sourceCustom")
+                : sourceInfo.type === "bundle"
+                ? t("editWord.sourceBundle")
+                : t("editWord.sourceUnknown")}
+            </ThemedText>
           </View>
         ) : null}
 
@@ -339,6 +365,13 @@ const styles = StyleSheet.create({
   },
   confidenceSection: {
     marginBottom: Spacing.xl,
+  },
+  sourceSection: {
+    marginBottom: Spacing.xl,
+  },
+  sourceValue: {
+    fontSize: 15,
+    fontWeight: "500",
   },
   sectionLabel: {
     fontSize: 13,

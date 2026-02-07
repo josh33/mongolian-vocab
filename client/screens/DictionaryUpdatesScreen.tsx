@@ -23,6 +23,10 @@ import {
   getDismissedPacks,
   acceptPack,
   dismissPack,
+  getWordOverrides,
+  getDeletedWordIds,
+  upgradePack,
+  PackUpgradeMode,
 } from "@/lib/storage";
 import type { Word } from "@/data/dictionary";
 import { formatWordCount } from "@/lib/i18n";
@@ -33,6 +37,7 @@ interface PackWithStatus {
   pack: DictionaryPackMeta;
   status: PackStatus;
   acceptedVersion?: number;
+  hasUserChanges?: boolean;
 }
 
 export default function DictionaryUpdatesScreen() {
@@ -47,13 +52,15 @@ export default function DictionaryUpdatesScreen() {
   const [previewPack, setPreviewPack] = useState<DictionaryPackMeta | null>(null);
   const [previewWords, setPreviewWords] = useState<Word[]>([]);
   const [applyingId, setApplyingId] = useState<string | null>(null);
-  const [lastResult, setLastResult] = useState<{ packTitle: string; wordCount: number } | null>(null);
+  const [lastResult, setLastResult] = useState<{ text: string } | null>(null);
 
   const loadPacks = useCallback(async () => {
     try {
-      const [acceptedPacks, dismissedPacks] = await Promise.all([
+      const [acceptedPacks, dismissedPacks, overrides, deletedIds] = await Promise.all([
         getAcceptedPacks(),
         getDismissedPacks(),
+        getWordOverrides(),
+        getDeletedWordIds(),
       ]);
 
       const withStatus: PackWithStatus[] = PACKS.map((pack) => {
@@ -74,7 +81,16 @@ export default function DictionaryUpdatesScreen() {
           status = "dismissed";
         }
 
-        return { pack, status, acceptedVersion };
+        let hasUserChanges = false;
+        if (status === "upgrade_available" && acceptedVersion !== undefined) {
+          const ids = getPackWords(pack.id, acceptedVersion).map(w => w.id);
+          const overrideIds = new Set(Object.keys(overrides).map(id => parseInt(id, 10)));
+          hasUserChanges =
+            ids.some(id => overrideIds.has(id)) ||
+            ids.some(id => deletedIds.includes(id));
+        }
+
+        return { pack, status, acceptedVersion, hasUserChanges };
       });
 
       setPacksWithStatus(withStatus);
@@ -94,11 +110,33 @@ export default function DictionaryUpdatesScreen() {
     setApplyingId(pack.id);
     try {
       await acceptPack(pack.id, pack.version);
-      setLastResult({ packTitle: pack.title, wordCount: pack.wordCount });
+      setLastResult({
+        text: t("dictionaryUpdates.resultAdded", {
+          packTitle: pack.title,
+          wordCount: formatWordCount(locale, pack.wordCount),
+        }),
+      });
       await loadPacks();
       setTimeout(() => setLastResult(null), 3000);
     } catch (error) {
       console.error("Failed to accept pack:", error);
+    } finally {
+      setApplyingId(null);
+    }
+  };
+
+  const handleUpgrade = async (pack: DictionaryPackMeta, mode: PackUpgradeMode) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setApplyingId(pack.id);
+    try {
+      await upgradePack(pack.id, pack.version, mode);
+      setLastResult({
+        text: t("dictionaryUpdates.resultUpdated", { packTitle: pack.title }),
+      });
+      await loadPacks();
+      setTimeout(() => setLastResult(null), 3000);
+    } catch (error) {
+      console.error("Failed to upgrade pack:", error);
     } finally {
       setApplyingId(null);
     }
@@ -125,9 +163,12 @@ export default function DictionaryUpdatesScreen() {
   const upgradePacks = packsWithStatus.filter((p) => p.status === "upgrade_available");
   const acceptedPacks = packsWithStatus.filter((p) => p.status === "accepted");
   const dismissedPacks = packsWithStatus.filter((p) => p.status === "dismissed");
+  const previewStatus = previewPack
+    ? packsWithStatus.find((p) => p.pack.id === previewPack.id)
+    : null;
 
   const renderPackItem = ({ item }: { item: PackWithStatus }) => {
-    const { pack, status, acceptedVersion } = item;
+    const { pack, status, acceptedVersion, hasUserChanges } = item;
     const isApplying = applyingId === pack.id;
 
     return (
@@ -183,7 +224,7 @@ export default function DictionaryUpdatesScreen() {
           </ThemedText>
         ) : null}
 
-        {status === "pending" || status === "upgrade_available" ? (
+        {status === "pending" ? (
           <View style={styles.buttonRow}>
             <Pressable
               style={[styles.previewButton, { borderColor: colors.primary }]}
@@ -205,9 +246,98 @@ export default function DictionaryUpdatesScreen() {
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
                 <>
-                  <Feather name={status === "upgrade_available" ? "arrow-up" : "plus"} size={16} color="#FFFFFF" />
+                  <Feather name="plus" size={16} color="#FFFFFF" />
                   <ThemedText style={styles.addButtonText}>
-                    {status === "upgrade_available" ? t("dictionaryUpdates.update") : t("dictionaryUpdates.add")}
+                    {t("dictionaryUpdates.add")}
+                  </ThemedText>
+                </>
+              )}
+            </Pressable>
+            <Pressable
+              style={[styles.dismissButton, { backgroundColor: colors.backgroundSecondary }]}
+              onPress={() => handleDismiss(pack)}
+              testID={`dismiss-button-${pack.id}`}
+            >
+              <Feather name="x" size={16} color={colors.textSecondary} />
+            </Pressable>
+          </View>
+        ) : null}
+
+        {status === "upgrade_available" && hasUserChanges ? (
+          <View style={styles.buttonColumn}>
+            <View style={[styles.buttonRow, styles.buttonRowCompact]}>
+              <Pressable
+                style={[styles.previewButton, { borderColor: colors.primary }]}
+                onPress={() => handlePreview(pack)}
+                testID={`preview-button-${pack.id}`}
+              >
+                <Feather name="eye" size={16} color={colors.primary} />
+                <ThemedText style={[styles.previewButtonText, { color: colors.primary }]}>
+                  {t("dictionaryUpdates.preview")}
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.dismissButton, { backgroundColor: colors.backgroundSecondary }]}
+                onPress={() => handleDismiss(pack)}
+                testID={`dismiss-button-${pack.id}`}
+              >
+                <Feather name="x" size={16} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+            <View style={styles.buttonRow}>
+              <Pressable
+                style={[styles.addButton, { backgroundColor: colors.primary }]}
+                onPress={() => handleUpgrade(pack, "new_words")}
+                disabled={isApplying}
+                testID={`update-new-words-button-${pack.id}`}
+              >
+                {isApplying ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <ThemedText style={styles.addButtonText}>
+                    {t("dictionaryUpdates.newWordsOnly")}
+                  </ThemedText>
+                )}
+              </Pressable>
+              <Pressable
+                style={[styles.previewButton, { borderColor: colors.primary }]}
+                onPress={() => handleUpgrade(pack, "reset")}
+                disabled={isApplying}
+                testID={`reset-pack-button-${pack.id}`}
+              >
+                <ThemedText style={[styles.previewButtonText, { color: colors.primary }]}>
+                  {t("dictionaryUpdates.resetPack")}
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
+        {status === "upgrade_available" && !hasUserChanges ? (
+          <View style={styles.buttonRow}>
+            <Pressable
+              style={[styles.previewButton, { borderColor: colors.primary }]}
+              onPress={() => handlePreview(pack)}
+              testID={`preview-button-${pack.id}`}
+            >
+              <Feather name="eye" size={16} color={colors.primary} />
+              <ThemedText style={[styles.previewButtonText, { color: colors.primary }]}>
+                {t("dictionaryUpdates.preview")}
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+              onPress={() => handleUpgrade(pack, "reset")}
+              disabled={isApplying}
+              testID={`update-button-${pack.id}`}
+            >
+              {isApplying ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Feather name="arrow-up" size={16} color="#FFFFFF" />
+                  <ThemedText style={styles.addButtonText}>
+                    {t("dictionaryUpdates.update")}
                   </ThemedText>
                 </>
               )}
@@ -267,7 +397,7 @@ export default function DictionaryUpdatesScreen() {
               >
                 <Feather name="check-circle" size={18} color={colors.success} />
                 <ThemedText style={[styles.resultText, { color: colors.success }]}>
-                  {t("dictionaryUpdates.resultAdded", { packTitle: lastResult.packTitle, wordCount: formatWordCount(locale, lastResult.wordCount) })}
+                  {lastResult.text}
                 </ThemedText>
               </View>
             ) : null}
@@ -354,19 +484,64 @@ export default function DictionaryUpdatesScreen() {
                 },
               ]}
             >
-              <Pressable
-                style={[styles.modalAddButton, { backgroundColor: colors.primary }]}
-                onPress={() => {
-                  handleAccept(previewPack);
-                  setPreviewPack(null);
-                }}
-                testID="modal-add-button"
-              >
-                <Feather name="plus" size={18} color="#FFFFFF" />
-                <ThemedText style={styles.modalAddButtonText}>
-                  {t("dictionaryUpdates.addWordsToDictionary", { wordCount: formatWordCount(locale, previewPack.wordCount) })}
-                </ThemedText>
-              </Pressable>
+              {previewStatus?.status === "upgrade_available" && previewStatus.hasUserChanges ? (
+                <View style={styles.modalButtonColumn}>
+                  <Pressable
+                    style={[styles.modalAddButton, { backgroundColor: colors.primary }]}
+                    onPress={() => {
+                      handleUpgrade(previewPack, "new_words");
+                      setPreviewPack(null);
+                    }}
+                    testID="modal-update-new-words-button"
+                  >
+                    <ThemedText style={styles.modalAddButtonText}>
+                      {t("dictionaryUpdates.newWordsOnly")}
+                    </ThemedText>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.modalSecondaryButton, { borderColor: colors.primary }]}
+                    onPress={() => {
+                      handleUpgrade(previewPack, "reset");
+                      setPreviewPack(null);
+                    }}
+                    testID="modal-reset-pack-button"
+                  >
+                    <ThemedText style={[styles.modalSecondaryButtonText, { color: colors.primary }]}>
+                      {t("dictionaryUpdates.resetPack")}
+                    </ThemedText>
+                  </Pressable>
+                </View>
+              ) : previewStatus?.status === "upgrade_available" ? (
+                <Pressable
+                  style={[styles.modalAddButton, { backgroundColor: colors.primary }]}
+                  onPress={() => {
+                    handleUpgrade(previewPack, "reset");
+                    setPreviewPack(null);
+                  }}
+                  testID="modal-update-button"
+                >
+                  <Feather name="arrow-up" size={18} color="#FFFFFF" />
+                  <ThemedText style={styles.modalAddButtonText}>
+                    {t("dictionaryUpdates.update")}
+                  </ThemedText>
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={[styles.modalAddButton, { backgroundColor: colors.primary }]}
+                  onPress={() => {
+                    handleAccept(previewPack);
+                    setPreviewPack(null);
+                  }}
+                  testID="modal-add-button"
+                >
+                  <Feather name="plus" size={18} color="#FFFFFF" />
+                  <ThemedText style={styles.modalAddButtonText}>
+                    {t("dictionaryUpdates.addWordsToDictionary", {
+                      wordCount: formatWordCount(locale, previewPack.wordCount),
+                    })}
+                  </ThemedText>
+                </Pressable>
+              )}
             </View>
           ) : null}
         </View>
@@ -443,6 +618,13 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     flexDirection: "row",
+    marginTop: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  buttonRowCompact: {
+    marginTop: 0,
+  },
+  buttonColumn: {
     marginTop: Spacing.lg,
     gap: Spacing.sm,
   },
@@ -555,6 +737,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
   },
+  modalButtonColumn: {
+    gap: Spacing.sm,
+  },
   modalAddButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -565,6 +750,17 @@ const styles = StyleSheet.create({
   },
   modalAddButtonText: {
     color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  modalSecondaryButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+  },
+  modalSecondaryButtonText: {
     fontSize: 16,
     fontWeight: "600",
   },
